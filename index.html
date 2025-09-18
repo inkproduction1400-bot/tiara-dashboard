@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>当日出勤ダッシュボード（試作 v2）</title>
+  <style>
+    :root{
+      --gap:8px;
+      --radius:8px;
+      --bg:#f7f7f8;
+      --panel:#ffffff;
+      --text:#222;
+      --muted:#666;
+      --line:#e5e7eb;
+      --accent:#3b82f6;
+      --sidebar:#0f172a;
+      --sidebarText:#e2e8f0;
+      --sidebarW: 200px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+    /* Sidebar */
+    .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+    .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 10px;}
+    .side-logo img{width:80%;height:auto;object-fit:contain}
+    .side-head{padding:4px 8px 0; font-weight:700; font-size:13px; opacity:.9}
+    .side-list{list-style:none;margin:0;padding:4px}
+    .side-list li{padding:6px 8px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px}
+    .side-list li:hover{background:rgba(255,255,255,.06)}
+    .side-list .active{background:rgba(255,255,255,.12)}
+
+    /* Main */
+    .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+    header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}    
+    .wrap{max-width:100%;padding:8px 12px;}
+    h1{font-size:16px;margin:0}
+    .toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;font-size:12px}
+    .toolbar button,.toolbar select,.toolbar input{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 8px;font-size:12px}
+    .toolbar .primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .content{flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;width:100%;height:100%;display:flex;flex-direction:column;}
+
+    /* Grid */
+    .grid{flex:1;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(3,1fr);gap:var(--gap);}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;}
+    .photo{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#777;position:relative;background:#ddd;}
+    .photo img{width:100%;height:100%;object-fit:cover}
+    .badges{position:absolute;top:2px;left:2px;display:flex;gap:2px}
+    .badge{font-size:12px}
+    .meta{padding:2px 4px;font-size:10px;border-top:1px solid var(--line);text-align:center;display:none}
+    .name{font-weight:700;}
+    .wage{color:var(--muted)}
+    .footer{flex:0 0 auto;display:flex;gap:6px;align-items:center;justify-content:center;padding:6px;font-size:12px;border-top:1px solid var(--line)}
+    .count{color:var(--muted)}
+
+    /* Modal (参考画像準拠) */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal-content{background:#fff;padding:30px;border-radius:12px;max-width:740px;width:92%;font-size:16px;border:1px solid #cfd3da;}
+    .modal-inner{display:grid;grid-template-columns:1fr 240px;gap:20px;align-items:start}
+    .modal-header{font-weight:700;font-size:18px;margin-bottom:15px}
+    .modal-img{width:240px;height:320px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb}
+    .kv{margin:6px 0;}
+    .kv .label{display:inline-block;min-width:8.5em;color:#222;}
+    .kv .value{display:inline-block;border-bottom:2px solid #333;min-width:8em;padding:2px 2px 0 2px;}
+    .btn-edit{display:inline-block;margin:10px 0 16px 0;padding:10px 18px;border:2px solid #333;border-radius:6px;background:#fff;cursor:pointer}
+    .block-title{font-weight:700;margin:14px 0 6px 0}
+    .line-kv{margin:10px 0;}
+    .line-kv .label{display:inline-block;min-width:8.5em;}
+    .line-kv .value{display:inline-block;border-bottom:2px solid #333;min-width:12em;padding:2px 2px 0 2px;}
+    .modal-actions{margin-top:22px;display:flex;gap:14px;justify-content:center}
+    .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="side-logo"><img src="img/logo.png" alt="LOGO"/></div>
+    <div class="side-head">機能一覧</div>
+    <ul class="side-list">
+      <li class="active">📊 ダッシュボード</li>
+      <li>🗓️ スケジュール</li>
+      <li>🧑‍🤝‍🧑 キャスト管理</li>
+      <li>🏪 店舗管理</li>
+      <li>💬 チャット（LINE）</li>
+      <li>🆘 SOS通知</li>
+      <li>📝 申請・承認</li>
+      <li>⚙️ 設定</li>
+    </ul>
+  </aside>
+
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <h1>当日出勤ダッシュボード（試作 v2）</h1>
+        <div class="toolbar">
+          <input id="q" placeholder="キーワード（名前・タグ）" />
+          <select id="owner"><option value="">担当者（すべて）</option><option>田中</option><option>佐藤</option><option>鈴木</option></select>
+          <select id="wage"><option value="">時給（すべて）</option><option value="3000-3999">3000–3999</option><option value="4000-4999">4000–4999</option><option value="5000-9999">5000+</option></select>
+          <select id="genre"><option value="">ジャンル（すべて）</option><option>キャバクラ</option><option>スナック</option><option>ラウンジ</option></select>
+          <select id="age"><option value="">年齢帯（すべて）</option><option value="18-22">18-22</option><option value="23-26">23-26</option><option value="27-32">27-32</option></select>
+          <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hideNg" /> NG除外</label>
+          <button onclick="applyFilters()">絞り込み</button>
+          <button class="primary" onclick="window.print()">印刷</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="panel">
+        <div id="cardView" class="grid"></div>
+        <div class="footer">
+          <button onclick="prevPage()">&lt;</button>
+          <span id="page"></span>
+          <button onclick="nextPage()">&gt;</button>
+          <div class="count" id="count"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header" id="modalTitle">キャスト詳細</div>
+      <div class="modal-inner">
+        <div id="modalBody"><!-- 動的入れ込み --></div>
+        <img id="modalImg" class="modal-img" src="" alt="cast"/>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">キャンセル</button>
+        <button class="btn primary">登録</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const names = ["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ことね","まこ","はる","まい","めい","ゆめ","ここ","れい","しおり","りん","りか","みお","ゆか","なつ","しずく","つばさ","みく","あや","ゆう","かのん","あんな","まどか","みさ"];
+const genres = ["キャバクラ","スナック","ラウンジ"];
+const owners = ["田中","佐藤","鈴木"];
+function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+const data = Array.from({length:120}).map((_,i)=>{
+  const name = names[i%names.length] + (i%2?"":"☆");
+  const wage = [3200,3800,4200,4800,5200,6000][i%6];
+  const age = rand(19,31);
+  const genre = genres[i%genres.length];
+  const owner = owners[i%owners.length];
+  const photo = (i===0?"img/cast1.jpeg":(i===1?"img/cast2.jpeg":null));
+  return {id:i+1,name,wage,genre,age,owner,photo,nominated:i%7===0,drink_ok:i%3!==0,ng:i%11===0};
+});
+
+let state={page:1,perPage:30,showDetails:false};
+
+function badges(d){
+  const arr=[];
+  if(d.nominated) arr.push("⭐");
+  arr.push(d.drink_ok?"🍺":"🚫");
+  const g=d.genre==="キャバクラ"?"🎀":(d.genre==="スナック"?"🥃":"💼");
+  arr.push(g);
+  return arr.map(x=>`<span class="badge">${x}</span>`).join("");
+}
+
+function paginate(arr){
+  const start=(state.page-1)*state.perPage;
+  return arr.slice(start,start+state.perPage);
+}
+
+function render(){
+  const arr = data;
+  const pageArr = paginate(arr);
+  const total = arr.length;
+
+  document.getElementById('count').textContent = `全 ${total} 名`;
+  document.getElementById('page').textContent = `${state.page} / ${Math.ceil(total/state.perPage)}`;
+
+  document.getElementById('cardView').innerHTML = pageArr.map(d => `
+    <div class="card" onclick="openModal(${d.id})">
+      <div class="photo">
+        <div class="badges">${badges(d)}</div>
+        ${d.photo ? `<img src="${d.photo}"/>` : 'PHOTO'}
+      </div>
+      <div class="meta" style="display:${state.showDetails ? 'block' : 'none'}">
+        <div class="name">${d.name}</div>
+        <div class="wage">¥${d.wage.toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function prevPage(){ if(state.page>1){ state.page--; render(); } }
+function nextPage(){ const max=Math.ceil(data.length/state.perPage); if(state.page<max){ state.page++; render(); } }
+
+function applyFilters(){
+  const q=document.getElementById('q').value.trim();
+  const owner=document.getElementById('owner').value;
+  const wage=document.getElementById('wage').value;
+  const genre=document.getElementById('genre').value;
+  const age=document.getElementById('age').value;
+  const hideNg=document.getElementById('hideNg').checked;
+  state.showDetails=!!(q||owner||wage||genre||age||hideNg); // フィルタ時のみ詳細表示
+  state.page=1;
+  render();
+}
+
+/* ===== Modal ===== */
+function openModal(id){
+  const cast=data.find(c=>c.id===id);
+  if(!cast) return;
+
+  // 画像
+  const imgEl = document.getElementById('modalImg');
+  imgEl.src = cast.photo || '';
+  imgEl.style.visibility = cast.photo ? 'visible' : 'hidden';
+
+  // 本文（参考画像の項目順）
+  document.getElementById('modalBody').innerHTML = `
+    <div class="kv"><span class="label">希望時給：</span><span class="value">¥${(cast.wage+1000).toLocaleString()}</span></div>
+    <div class="kv"><span class="label">本時給　：</span><span class="value">¥${cast.wage.toLocaleString()}</span></div>
+    <div class="kv"><span class="label">希望ジャンル：</span><span class="value">${cast.genre}</span></div>
+    <div class="kv"><span class="label">年齢　　：</span><span class="value">${cast.age} 歳</span></div>
+
+    <button class="btn-edit" type="button">編集</button>
+
+    <div class="line-kv"><span class="label">前回の店舗：</span><span class="value">○○○店</span></div>
+    <div class="line-kv"><span class="label">本日の店舗：</span><span class="value">□□□店</span></div>
+    <div class="line-kv"><span class="label">指名の店舗：</span><span class="value">△△△店</span></div>
+    <div class="line-kv"><span class="label">NG店舗　：</span><span class="value">　　店</span></div>
+  `;
+
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal').style.display='none'; }
+
+render();
+</script>
+</body>
+</html>
