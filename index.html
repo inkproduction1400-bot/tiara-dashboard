@@ -1,80 +1,132 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>当日出勤ダッシュボード（試作 v2）</title>
+  <title>当日出勤ダッシュボード（試作 v3.2）</title>
   <style>
     :root{
       --gap:8px;
-      --radius:8px;
+      --radius:10px;
       --bg:#f7f7f8;
       --panel:#ffffff;
       --text:#222;
-      --muted:#666;
+      --muted:#667085;
       --line:#e5e7eb;
-      --accent:#3b82f6;
+      --accent:#2563eb;
+      --accent-weak:#e0e7ff;
       --sidebar:#0f172a;
       --sidebarText:#e2e8f0;
       --sidebarW: 200px;
+      --cardH: 176px; /* 3段＋フッター常時表示 */
+      --shadow:0 8px 24px rgba(16,24,40,.08);
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+    body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
 
-    /* Sidebar */
+    /* ==== Sidebar ==== */
     .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
     .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 10px;}
-    .side-logo img{width:80%;height:auto;object-fit:contain}
+    .side-logo img{width:80%; height:auto; object-fit:contain}
     .side-head{padding:4px 8px 0; font-weight:700; font-size:13px; opacity:.9}
     .side-list{list-style:none;margin:0;padding:4px}
     .side-list li{padding:6px 8px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px}
     .side-list li:hover{background:rgba(255,255,255,.06)}
     .side-list .active{background:rgba(255,255,255,.12)}
 
-    /* Main */
+    /* ==== Main & Header ==== */
     .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
-    header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}    
-    .wrap{max-width:100%;padding:8px 12px;}
-    h1{font-size:16px;margin:0}
-    .toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;font-size:12px}
-    .toolbar button,.toolbar select,.toolbar input{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 8px;font-size:12px}
-    .toolbar .primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-    .content{flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;}
-    .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;width:100%;height:100%;display:flex;flex-direction:column;}
+    header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+    .wrap{max-width:100%; padding:8px 12px;}
+    .head-top{display:flex; align-items:center; gap:10px; justify-content:space-between; flex-wrap:wrap;}
+    .title{font-size:16px; font-weight:700; margin:0;}
+    .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+    .role{font-weight:700}
+    .login{display:flex; align-items:center; gap:6px;}
+    .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+    .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
 
-    /* Grid */
-    .grid{flex:1;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(3,1fr);gap:var(--gap);}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;}
-    .photo{flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#777;position:relative;background:#ddd;}
-    .photo img{width:100%;height:100%;object-fit:cover}
-    .badges{position:absolute;top:2px;left:2px;display:flex;gap:2px}
-    .badge{font-size:12px}
-    .meta{padding:2px 4px;font-size:10px;border-top:1px solid var(--line);text-align:center;display:none}
-    .name{font-weight:700;}
-    .wage{color:var(--muted)}
-    .footer{flex:0 0 auto;display:flex;gap:6px;align-items:center;justify-content:center;padding:6px;font-size:12px;border-top:1px solid var(--line)}
-    .count{color:var(--muted)}
+    /* ==== Toolbar ==== */
+    .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px 0 6px 0; font-size:12px}
+    .toolbar input[type="text"], .toolbar select{border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 8px; font-size:12px;}
+    .radios{display:flex; align-items:center; gap:8px;}
+    .radios label{display:flex; align-items:center; gap:4px;}
+    .filters{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+    .chip{border:1px solid var(--line); background:#fff; padding:6px 10px; border-radius:999px; cursor:pointer;}
+    .chip.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+    .spacer{flex:1 1 auto}
 
-    /* Modal (参考画像準拠) */
-    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal-content{background:#fff;padding:30px;border-radius:12px;max-width:740px;width:92%;font-size:16px;border:1px solid #cfd3da;}
-    .modal-inner{display:grid;grid-template-columns:1fr 240px;gap:20px;align-items:start}
-    .modal-header{font-weight:700;font-size:18px;margin-bottom:15px}
-    .modal-img{width:240px;height:320px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb}
-    .kv{margin:6px 0;}
-    .kv .label{display:inline-block;min-width:8.5em;color:#222;}
-    .kv .value{display:inline-block;border-bottom:2px solid #333;min-width:8em;padding:2px 2px 0 2px;}
-    .btn-edit{display:inline-block;margin:10px 0 16px 0;padding:10px 18px;border:2px solid #333;border-radius:6px;background:#fff;cursor:pointer}
-    .block-title{font-weight:700;margin:14px 0 6px 0}
-    .line-kv{margin:10px 0;}
-    .line-kv .label{display:inline-block;min-width:8.5em;}
-    .line-kv .value{display:inline-block;border-bottom:2px solid #333;min-width:12em;padding:2px 2px 0 2px;}
-    .modal-actions{margin-top:22px;display:flex;gap:14px;justify-content:center}
-    .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer}
-    .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    /* ==== Counters ==== */
+    .counters{display:flex; gap:8px; margin-left:8px; flex-wrap:wrap}
+    .counter{background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 10px; font-size:12px;}
+
+    /* ==== Board ==== */
+    .content{flex:1 1 auto; display:flex; flex-direction:column;}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 10px 0 10px;margin:8px;display:flex;flex-direction:column; height:calc(100vh - 172px);}
+    .grid-wrap{flex:1 1 auto; overflow:hidden; padding:2px 2px 6px;}
+    .grid{display:grid; grid-template-columns:repeat(9,1fr); grid-auto-rows:var(--cardH); gap:var(--gap); height:100%;}
+
+    /* ==== Card ==== */
+    .card{background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; user-select:none; transition:box-shadow .15s ease;}
+    .card:hover{box-shadow:var(--shadow)}
+    .photo{position:relative; height:60%;}
+    .photo-inner{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:#ddd;}
+    .photo-inner img{width:100%; height:100%; object-fit:cover}
+    .mark{position:absolute; top:4px; left:4px; background:rgba(255,255,255,.92); border:1px solid var(--line); padding:2px 6px; border-radius:999px; font-weight:700;}
+    .text{height:40%; display:flex; flex-direction:column; padding:6px 8px; gap:4px; border-top:1px solid var(--line)}
+    .name{font-weight:700; font-size:13px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .meta{display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--text)}
+    .meta .line{display:flex; align-items:center; gap:6px;}
+    .label{color:var(--muted)}
+    .value{font-variant-numeric:tabular-nums}
+
+    /* ==== Drop Zone ==== */
+    .dropcol{grid-column: 9 / span 1; grid-row: 1 / span 3; display:flex; flex-direction:column; border:1px dashed var(--line); border-radius:10px; padding:10px; background:#fafafa;}
+    .drop-head{display:flex; flex-direction:column; gap:6px; margin-bottom:8px;}
+    .drop-head select{border:1px solid var(--line); border-radius:8px; padding:8px; font-size:12px; background:#fff}
+    .drop-zone{flex:1 1 auto; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; padding:8px; overflow:auto;}
+    .drop-zone.over{background:#f8fafc; border-color:#94a3b8}
+    .chip-name{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; margin-bottom:6px; font-size:12px;}
+    .chip-name .remove{cursor:pointer; border:none; background:#fee2e2; border:1px solid #fecaca; padding:0 6px; border-radius:6px;}
+    .drop-actions{display:flex; gap:8px; margin-top:8px;}
+    .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer}
+    .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+
+    /* ==== Footer / Pager ==== */
+    .footer{flex:0 0 auto; display:flex; gap:8px; align-items:center; justify-content:center; padding:10px; border-top:1px solid var(--line); margin-top:6px; background:#fff;}
+    .footer .count{color:var(--muted)}
+    .footer button{border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer}
+
+    /* ==== Modal (renew) ==== */
+    .modal{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:50}
+    .modal-content{background:#fff; padding:18px; border-radius:16px; max-width:980px; width:92%; border:1px solid #eef2f7; box-shadow:var(--shadow); }
+    .modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+    .modal-title{font-weight:800; font-size:16px; letter-spacing:.02em}
+    .modal-inner{display:grid; grid-template-columns:1.1fr 340px; gap:18px; align-items:start}
+    /* info panel */
+    .info{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px;}
+    .grid-info{display:grid; grid-template-columns:140px 1fr; row-gap:8px; column-gap:10px; align-items:center;}
+    .grid-info .ilabel{color:#475569; font-size:12px; letter-spacing:.02em}
+    .grid-info .ivalue{font-size:13px; padding:6px 10px; background:#f8fafc; border:1px solid #eef2f7; border-radius:8px;}
+    .pill{display:inline-flex; gap:6px; align-items:center; padding:3px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; font-size:12px;}
+    .ivalue .pill.ok{background:#ecfdf5; border-color:#a7f3d0;}
+    .ivalue .pill.no{background:#fef2f2; border-color:#fecaca;}
+    /* slider */
+    .slider{position:relative; width:100%; aspect-ratio:3/4; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb; background:#f3f4f6;}
+    .slider img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:opacity .25s ease;}
+    .slider .nav{position:absolute; inset:auto 8px 8px 8px; display:flex; justify-content:center; gap:6px;}
+    .dot{width:8px; height:8px; border-radius:999px; background:#e5e7eb; border:1px solid #cbd5e1; opacity:.9}
+    .dot.active{background:#2563eb; border-color:#2563eb}
+    .sbtn{position:absolute; top:50%; transform:translateY(-50%); border:none; background:rgba(255,255,255,.9); border:1px solid #e5e7eb; width:32px; height:32px; border-radius:999px; cursor:pointer; }
+    .sbtn:hover{background:#fff}
+    .sbtn.prev{left:8px}
+    .sbtn.next{right:8px}
+    .modal-actions{margin-top:14px; display:flex; gap:10px; justify-content:center}
   </style>
 </head>
 <body>
+  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="side-logo"><img src="img/logo3.png" alt="LOGO"/></div>
     <div class="side-head">機能一覧</div>
@@ -90,26 +142,60 @@
     </ul>
   </aside>
 
+  <!-- Main -->
   <div class="main">
     <header>
       <div class="wrap">
-        <h1>当日出勤ダッシュボード（試作）</h1>
+        <div class="head-top">
+          <h1 class="title">当日出勤ダッシュボード（試作）</h1>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span><span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+          </div>
+        </div>
+
         <div class="toolbar">
-          <input id="q" placeholder="キーワード（名前・タグ）" />
+          <input id="q" type="text" placeholder="キーワード（名前）" style="min-width:220px"/>
           <select id="owner"><option value="">担当者（すべて）</option><option>田中</option><option>佐藤</option><option>鈴木</option></select>
-          <select id="wage"><option value="">時給（すべて）</option><option value="3000-3999">3000–3999</option><option value="4000-4999">4000–4999</option><option value="5000-9999">5000+</option></select>
-          <select id="genre"><option value="">ジャンル（すべて）</option><option>キャバクラ</option><option>スナック</option><option>ラウンジ</option></select>
-          <select id="age"><option value="">年齢帯（すべて）</option><option value="18-22">18-22</option><option value="23-26">23-26</option><option value="27-32">27-32</option></select>
-          <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hideNg" /> NG除外</label>
-          <button onclick="applyFilters()">絞り込み</button>
-          <button class="primary" onclick="window.print()">印刷</button>
+
+          <div class="radios" id="sortRadios">
+            <label><input type="radio" name="sortBy" value="kana" checked /> 50音順</label>
+            <label><input type="radio" name="sortBy" value="wage" /> 時給順</label>
+            <label><input type="radio" name="sortBy" value="age" /> 年齢順</label>
+          </div>
+
+          <div class="filters">
+            <button class="chip active" data-filter="today" onclick="setFilter(this)">本日出勤</button>
+            <button class="chip" data-filter="notToday" onclick="setFilter(this)">本日未出勤</button>
+            <button class="chip" data-filter="matched" onclick="setFilter(this)">マッチ済み</button>
+          </div>
+
+          <div class="counters">
+            <div class="counter">本日の出勤：<b id="cntToday">0</b> 名</div>
+            <div class="counter">配置済み：<b id="cntAssigned">0</b> 名</div>
+            <div class="counter">明日の出勤予定：<b id="cntTomorrow">0</b> 名</div>
+          </div>
+
+          <div class="spacer"></div>
         </div>
       </div>
     </header>
 
+    <!-- Board -->
     <div class="content">
       <div class="panel">
-        <div id="cardView" class="grid"></div>
+        <div class="grid-wrap">
+          <div id="board" class="grid"></div>
+        </div>
         <div class="footer">
           <button onclick="prevPage()">&lt;</button>
           <span id="page"></span>
@@ -120,119 +206,274 @@
     </div>
   </div>
 
-  <!-- Modal -->
+  <!-- Modal (renew) -->
   <div id="modal" class="modal" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header" id="modalTitle">キャスト詳細</div>
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">キャスト詳細</div>
+        <button class="btn" onclick="closeModal()">× 閉じる</button>
+      </div>
       <div class="modal-inner">
-        <div id="modalBody"><!-- 動的入れ込み --></div>
-        <img id="modalImg" class="modal-img" src="" alt="cast"/>
+        <!-- left: info -->
+        <div class="info">
+          <div id="infoGrid" class="grid-info"></div>
+        </div>
+        <!-- right: slider -->
+        <div>
+          <div class="slider" id="slider">
+            <img id="slideImg" alt="">
+            <button class="sbtn prev" onclick="slidePrev()">‹</button>
+            <button class="sbtn next" onclick="slideNext()">›</button>
+            <div class="nav" id="slideDots"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">キャンセル</button>
+        <button class="btn">編集</button>
         <button class="btn primary">登録</button>
       </div>
     </div>
   </div>
 
 <script>
-const names = ["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ことね","まこ","はる","まい","めい","ゆめ","ここ","れい","しおり","りん","りか","みお","ゆか","なつ","しずく","つばさ","みく","あや","ゆう","かのん","あんな","まどか","みさ"];
-const genres = ["キャバクラ","スナック","ラウンジ"];
-const owners = ["田中","佐藤","鈴木"];
-function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min}
-const data = Array.from({length:120}).map((_,i)=>{
-  const name = names[i%names.length] + (i%2?"":"☆");
-  const wage = [3200,3800,4200,4800,5200,6000][i%6];
-  const age = rand(19,31);
-  const genre = genres[i%genres.length];
-  const owner = owners[i%owners.length];
-  const photo = (i===0?"img/cast1.jpeg":(i===1?"img/cast2.jpeg":null));
-  return {id:i+1,name,wage,genre,age,owner,photo,nominated:i%7===0,drink_ok:i%3!==0,ng:i%11===0};
+/* ====== ダミーデータ（2000名） ====== */
+const NAMES = ["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ことね","まこ","はる","まい","めい","ゆめ","ここ","れい","しおり","りん","りか","みお","ゆか","なつ","しずく","つばさ","みく","あや","ゆう","かのん","あんな","まどか","みさ","ののか","はな","ゆな","みこ","もも","かえで","ほのか","あかね","みさき"];
+const OWNERS = ["田中","佐藤","鈴木"];
+const SHOPS = [
+  {id:"akasaka", name:"赤坂本店", req:{drink:"o"} , need:5},
+  {id:"shibuya", name:"渋谷店", req:{drink:"d"} , need:4},
+  {id:"ginza",   name:"銀座店",   req:{drink:"x"} , need:3},
+];
+const DRINKS = ["o","d","x"];
+function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+function sample(a){return a[Math.floor(Math.random()*a.length)]}
+function kanaKey(s){return s.normalize('NFKC')}
+
+const ALL = Array.from({length:2000}).map((_,i)=>{
+  const name = NAMES[i % NAMES.length] + (i%10===0 ? "☆" : "");
+  const wage = [3200,3500,3800,4200,4800,5200,6000][i%7];
+  const age = randInt(18,32);
+  const owner = OWNERS[i%OWNERS.length];
+  const drink = DRINKS[i%3];
+  // 写真スライダー用：2〜3枚（ダミー）
+  const photos = [];
+  const p1 = (i%97===0) ? "img/cast1.jpeg" : (i%131===0 ? "img/cast2.jpeg" : null);
+  if(p1) photos.push(p1);
+  if((i+7)%97===0) photos.push("img/cast1.jpeg");
+  if((i+13)%131===0) photos.push("img/cast2.jpeg");
+
+  const workingToday = i%2===0;
+  const workingTomorrow = i%3===0;
+  const matched = i%13===0;
+  const ngShops = (i%17===0)? ["akasaka"] : [];
+  const todaysShop = workingToday ? sample(SHOPS).name : "—";
+  const lastShop = sample(["○○○店","□□□店","△△△店","—"]);
+  const storeNgFlag = ngShops.length>0;
+
+  return {id:i+1, name, wage, age, owner, drink, photos, workingToday, workingTomorrow, matched, ngShops, todaysShop, lastShop, storeNgFlag};
 });
 
-let state={page:1,perPage:30,showDetails:false};
+/* ====== 状態 ====== */
+let state = { page:1, filter:"today", sortBy:"kana", login:{role:"ADMIN", user:"admin"}, owner:"", q:"", shopId:"", cart:[] };
 
-function badges(d){
-  const arr=[];
-  if(d.nominated) arr.push("⭐");
-  arr.push(d.drink_ok?"🍺":"🚫");
-  const g=d.genre==="キャバクラ"?"🎀":(d.genre==="スナック"?"🥃":"💼");
-  arr.push(g);
-  return arr.map(x=>`<span class="badge">${x}</span>`).join("");
+/* ====== 共通ユーティリティ ====== */
+function fmtYen(n){return "¥" + n.toLocaleString()}
+function drinkMark(d){return d==="o"?"○":(d==="d"?"△":"×")}
+function matchByShop(cast, shop){
+  if(!shop) return true;
+  if(cast.ngShops?.includes(shop.id)) return false;
+  const req = shop.req?.drink || "x";
+  if(req==="o") return cast.drink==="o";
+  if(req==="d") return cast.drink==="o" || cast.drink==="d";
+  return true;
 }
 
-function paginate(arr){
-  const start=(state.page-1)*state.perPage;
-  return arr.slice(start,start+state.perPage);
-}
-
-function render(){
-  const arr = data;
-  const pageArr = paginate(arr);
-  const total = arr.length;
-
-  document.getElementById('count').textContent = `全 ${total} 名`;
-  document.getElementById('page').textContent = `${state.page} / ${Math.ceil(total/state.perPage)}`;
-
-  document.getElementById('cardView').innerHTML = pageArr.map(d => `
-    <div class="card" onclick="openModal(${d.id})">
-      <div class="photo">
-        <div class="badges">${badges(d)}</div>
-        ${d.photo ? `<img src="${d.photo}"/>` : 'PHOTO'}
-      </div>
-      <div class="meta" style="display:${state.showDetails ? 'block' : 'none'}">
-        <div class="name">${d.name}</div>
-        <div class="wage">¥${d.wage.toLocaleString()}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function prevPage(){ if(state.page>1){ state.page--; render(); } }
-function nextPage(){ const max=Math.ceil(data.length/state.perPage); if(state.page<max){ state.page++; render(); } }
-
-function applyFilters(){
-  const q=document.getElementById('q').value.trim();
-  const owner=document.getElementById('owner').value;
-  const wage=document.getElementById('wage').value;
-  const genre=document.getElementById('genre').value;
-  const age=document.getElementById('age').value;
-  const hideNg=document.getElementById('hideNg').checked;
-  state.showDetails=!!(q||owner||wage||genre||age||hideNg); 
-  state.page=1;
+/* ====== ログイン切替/並び順/検索/担当 ====== */
+loginSelect.addEventListener('change', ()=>{
+  const [role,user] = loginSelect.value.split(':');
+  state.login = {role, user};
+  document.getElementById('roleBadge').textContent = (role==="ADMIN"?"管理者":"担当者");
+  document.getElementById('owner').parentElement.style.display = (role==="ADMIN") ? "flex":"none";
+  if(role==="STAFF"){
+    const me = (user==="tanaka"?"田中": user==="sato"?"佐藤":"鈴木");
+    state.owner = me; document.getElementById('owner').value = me;
+  }else{
+    state.owner = document.getElementById('owner').value = "";
+  }
   render();
+});
+document.getElementById('sortRadios').addEventListener('change', (e)=>{ if(e.target.name==="sortBy"){ state.sortBy = e.target.value; state.page=1; render(); }});
+document.getElementById('q').addEventListener('input', (e)=>{ state.q = e.target.value.trim(); state.page=1; render(); });
+document.getElementById('owner').addEventListener('change', (e)=>{ state.owner = e.target.value; state.page=1; render(); });
+
+/* ====== フィルタ3種 ====== */
+function setFilter(btn){ document.querySelectorAll('.chip[data-filter]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.filter = btn.dataset.filter; state.page=1; render(); }
+
+/* ====== ページャ ====== */
+function prevPage(){ if(state.page>1){ state.page--; render(); } }
+function nextPage(){ const max=Math.max(1, Math.ceil(filtered().length / 24)); if(state.page<max){ state.page++; render(); } }
+
+/* ====== 絞り込み/並び替え ====== */
+function filtered(){
+  const q = state.q, role = state.login.role, owner = state.owner, shop = SHOPS.find(s=>s.id===state.shopId);
+  let arr = ALL.filter(c=>{
+    if(role==="STAFF"){ const me = (state.login.user==="tanaka"?"田中": state.login.user==="sato"?"佐藤":"鈴木"); if(c.owner !== me) return false; }
+    else { if(owner && c.owner !== owner) return false; }
+    if(state.filter==="today" && !c.workingToday) return false;
+    if(state.filter==="notToday" && c.workingToday) return false;
+    if(state.filter==="matched" && !c.matched) return false;
+    if(q && !kanaKey(c.name).includes(q)) return false;
+    if(shop && !matchByShop(c, shop)) return false;
+    return true;
+  });
+  if(state.sortBy==="kana"){ arr.sort((a,b)=>kanaKey(a.name).localeCompare(kanaKey(b.name))); }
+  else if(state.sortBy==="wage"){ arr.sort((a,b)=>b.wage - a.wage); }
+  else if(state.sortBy==="age"){ arr.sort((a,b)=>a.age - b.age); }
+  return arr;
 }
 
-/* ===== Modal ===== */
+/* ====== カウンタ更新 ====== */
+function updateCounters(){
+  const today = ALL.filter(c=>c.workingToday).length;
+  const assigned = ALL.filter(c=>c.matched).length;
+  const tomorrow = ALL.filter(c=>c.workingTomorrow).length;
+  document.getElementById('cntToday').textContent = today;
+  document.getElementById('cntAssigned').textContent = assigned;
+  document.getElementById('cntTomorrow').textContent = tomorrow;
+}
+
+/* ====== DnD（カード→ドロップ枠） ====== */
+function onDragStart(e, id){ e.dataTransfer.setData('text/plain', String(id)); e.dataTransfer.effectAllowed = 'copy'; }
+function onDragOver(e){ e.preventDefault(); document.getElementById('dropZone').classList.add('over'); }
+function onDragLeave(){ document.getElementById('dropZone').classList.remove('over'); }
+function onDrop(e){ e.preventDefault(); document.getElementById('dropZone').classList.remove('over'); const id = Number(e.dataTransfer.getData('text/plain')); if(!id) return; if(!state.cart.includes(id)){ state.cart.push(id); renderDropList(); } }
+function removeFromCart(id){ state.cart = state.cart.filter(x=>x!==id); renderDropList(); }
+function confirmAssign(){ ALL.forEach(c=>{ if(state.cart.includes(c.id)) c.matched = true; }); state.cart = []; renderDropList(); render(); alert("割当を確定しました（デモ）"); }
+function renderDropList(){ const box = document.getElementById('dropList'); box.innerHTML = state.cart.map(id=>{ const c = ALL.find(x=>x.id===id); return `<div class="chip-name"><span>${c?.name || id}</span><button class="remove" onclick="removeFromCart(${id})">×</button></div>`; }).join('') || `<div style="color:#94a3b8; font-size:12px;">ここにキャストカードをドラッグ＆ドロップ</div>`; }
+
+/* ====== モーダル（情報＋スライダー） ====== */
+let slider = { idx:0, imgs:[] };
 function openModal(id){
-  const cast=data.find(c=>c.id===id);
-  if(!cast) return;
+  const c = ALL.find(x=>x.id===id); if(!c) return;
 
-  // 画像
-  const imgEl = document.getElementById('modalImg');
-  imgEl.src = cast.photo || '';
-  imgEl.style.visibility = cast.photo ? 'visible' : 'hidden';
+  // info grid（項目とデザイン刷新）
+  const info = [
+    ["氏名", c.name],
+    ["時給", fmtYen(c.wage)],
+    ["年齢", `${c.age} 歳`],
+    ["担当者", c.owner],
+    ["飲酒", `<span class="pill">${drinkMark(c.drink)}</span>`],
+    ["本日出勤", `<span class="pill ${c.workingToday?'ok':'no'}">${c.workingToday?'はい':'いいえ'}</span>`],
+    ["出勤予定", c.workingTomorrow ? "明日" : "—"],
+    ["NG店舗", (c.ngShops||[]).map(id=>SHOPS.find(s=>s.id===id)?.name||id).join(" / ") || "なし"],
+    ["店舗NG", c.storeNgFlag ? "あり" : "なし"],
+    ["本日の店舗", c.todaysShop || "—"],
+    ["前回の店舗", c.lastShop || "—"],
+  ];
+  const grid = document.getElementById('infoGrid');
+  grid.innerHTML = info.map(([k,v])=>`<div class="ilabel">${k}</div><div class="ivalue">${v}</div>`).join('');
 
-  // 本文（参考画像の項目順）
-  document.getElementById('modalBody').innerHTML = `
-    <div class="kv"><span class="label">希望時給：</span><span class="value">¥${(cast.wage+1000).toLocaleString()}</span></div>
-    <div class="kv"><span class="label">本時給　：</span><span class="value">¥${cast.wage.toLocaleString()}</span></div>
-    <div class="kv"><span class="label">希望ジャンル：</span><span class="value">${cast.genre}</span></div>
-    <div class="kv"><span class="label">年齢　　：</span><span class="value">${cast.age} 歳</span></div>
+  // slider
+  slider.imgs = (c.photos && c.photos.length>0) ? c.photos : [""]; // 空ならプレースホルダ
+  slider.idx = 0;
+  applySlide();
 
-    <button class="btn-edit" type="button">編集</button>
-
-    <div class="line-kv"><span class="label">前回の店舗：</span><span class="value">○○○店</span></div>
-    <div class="line-kv"><span class="label">本日の店舗：</span><span class="value">□□□店</span></div>
-    <div class="line-kv"><span class="label">指名の店舗：</span><span class="value">△△△店</span></div>
-    <div class="line-kv"><span class="label">NG店舗　：</span><span class="value">　　店</span></div>
-  `;
-
-  document.getElementById('modal').style.display='flex';
+  document.getElementById('modal').style.display = 'flex';
 }
 function closeModal(){ document.getElementById('modal').style.display='none'; }
+function applySlide(){
+  const imgEl = document.getElementById('slideImg');
+  const dots = document.getElementById('slideDots');
+  const src = slider.imgs[slider.idx];
+  imgEl.style.opacity = 0;
+  if(src){ imgEl.src = src; imgEl.alt = `photo ${slider.idx+1}`; }
+  else { // placeholder
+    imgEl.removeAttribute('src');
+    imgEl.alt = 'no photo';
+    imgEl.style.background = '#e5e7eb';
+  }
+  requestAnimationFrame(()=>{ imgEl.style.opacity = 1; });
+  dots.innerHTML = slider.imgs.map((_,i)=>`<div class="dot ${i===slider.idx?'active':''}" onclick="slideGoto(${i})"></div>`).join('');
+}
+function slidePrev(){ slider.idx = (slider.idx - 1 + slider.imgs.length) % slider.imgs.length; applySlide(); }
+function slideNext(){ slider.idx = (slider.idx + 1) % slider.imgs.length; applySlide(); }
+function slideGoto(i){ slider.idx = i; applySlide(); }
 
-render();
+/* ====== レンダリング ====== */
+function render(){
+  updateCounters();
+  const list = filtered();
+  const perCards = 24; // 8×3（右端は店舗枠）
+  const maxPage = Math.max(1, Math.ceil(list.length / perCards));
+  if(state.page>maxPage) state.page = maxPage;
+
+  const pageCards = list.slice((state.page-1)*perCards, (state.page-1)*perCards+perCards);
+  const cardsHtml = pageCards.map(c=>cardHtml(c)).join('');
+  const dropHtml = `
+    <div class="dropcol">
+      <div class="drop-head">
+        <label class="label">店舗選択</label>
+        <select id="shopSelect">
+          <option value="">（未選択）</option>
+          ${SHOPS.map(s=>`<option value="${s.id}" ${s.id===state.shopId?"selected":""}>${s.name}</option>`).join('')}
+        </select>
+        <div class="badge"><span class="label">要件:</span><span id="shopReqLabel">-</span></div>
+      </div>
+      <div id="dropZone" class="drop-zone" ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+        <div id="dropList"></div>
+      </div>
+      <div class="drop-actions">
+        <button class="btn" onclick="state.cart=[]; renderDropList()">クリア</button>
+        <button class="btn primary" onclick="confirmAssign()">確定</button>
+      </div>
+    </div>`;
+  document.getElementById('board').innerHTML = cardsHtml + dropHtml;
+
+  renderDropList();
+  updateShopReqLabel();
+
+  document.getElementById('count').textContent = `全 ${list.length} 名`;
+  document.getElementById('page').textContent = `${state.page} / ${maxPage}`;
+}
+
+function cardHtml(d){
+  const mark = drinkMark(d.drink);
+  const first = d.photos?.[0];
+  const img = first ? `<img src="${first}" alt="">` : '';
+  return `
+  <div class="card" draggable="true" ondragstart="onDragStart(event, ${d.id})" onclick="openModal(${d.id})">
+    <div class="photo">
+      <span class="mark">${mark}</span>
+      <div class="photo-inner">${img || "PHOTO"}</div>
+    </div>
+    <div class="text">
+      <div class="name" title="${d.name}">${d.name}</div>
+      <div class="meta">
+        <div class="line"><span class="label">時給</span><span class="value">${fmtYen(d.wage)}</span></div>
+        <div class="line"><span class="label">年齢</span><span class="value">${d.age} 歳</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 店舗選択変更 */
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id==="shopSelect"){ state.shopId = e.target.value || ""; state.page = 1; render(); }
+});
+function updateShopReqLabel(){
+  const s = SHOPS.find(x=>x.id===state.shopId);
+  const el = document.getElementById('shopReqLabel');
+  if(!el) return;
+  if(!s){ el.textContent = "-"; return; }
+  const txt = s.req?.drink==="o" ? "○のみ" : s.req?.drink==="d" ? "○/△" : "制約なし";
+  el.textContent = `酒: ${txt}`;
+}
+
+/* 初期化 */
+(function init(){
+  document.getElementById('owner').parentElement.style.display = "flex";
+  render();
+})();
 </script>
 </body>
 </html>
