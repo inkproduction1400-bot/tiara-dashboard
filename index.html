@@ -76,16 +76,16 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="side-logo"><img src="img/logo.png" alt="LOGO"/></div>
+    <div class="side-logo"><img src="img/logo2.png" alt="LOGO"/></div>
     <div class="side-head">機能一覧</div>
     <ul class="side-list">
-      <li class="active">📊 ダッシュボード</li>
-      <li>🗓️ スケジュール</li>
-      <li>🧑‍🤝‍🧑 キャスト管理</li>
-      <li>🏪 店舗管理</li>
-      <li>💬 チャット（LINE）</li>
-      <li>🆘 SOS通知</li>
-      <li>📝 申請・承認</li>
+      <li class="active">ダッシュボード</li>
+      <li>スケジュール</li>
+      <li>キャスト管理</li>
+      <li>店舗管理</li>
+      <li>チャット（LINE）</li>
+      <li>SOS通知</li>
+      <li>申請・承認</li>
       <li>⚙️ 設定</li>
     </ul>
   </aside>
@@ -93,7 +93,7 @@
   <div class="main">
     <header>
       <div class="wrap">
-        <h1>当日出勤ダッシュボード（試作 v2）</h1>
+        <h1>当日出勤ダッシュボード（試作）</h1>
         <div class="toolbar">
           <input id="q" placeholder="キーワード（名前・タグ）" />
           <select id="owner"><option value="">担当者（すべて）</option><option>田中</option><option>佐藤</option><option>鈴木</option></select>
@@ -198,7 +198,7 @@ function applyFilters(){
   const genre=document.getElementById('genre').value;
   const age=document.getElementById('age').value;
   const hideNg=document.getElementById('hideNg').checked;
-  state.showDetails=!!(q||owner||wage||genre||age||hideNg); // フィルタ時のみ詳細表示
+  state.showDetails=!!(q||owner||wage||genre||age||hideNg); 
   state.page=1;
   render();
 }
