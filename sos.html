@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SOSアラート | 受信・通知・詳細</title>
+<style>
+  :root{
+    --gap:6px; --radius:10px; --bg:#f7f7f8; --panel:#ffffff; --text:#222;
+    --muted:#667085; --line:#e5e7eb; --accent:#2563eb; --danger:#ef4444; --danger-2:#dc2626; --ok:#16a34a;
+    --sidebar:#0f172a; --sidebarText:#e2e8f0;
+    --sidebarW:160px; --wrapW:1160px; --shadow:0 8px 24px rgba(16,24,40,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+  /* Sidebar（共通） */
+  .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+  .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 6px;}
+  .side-logo img{width:86%; height:auto; object-fit:contain}
+  .side-group{margin-bottom:8px;}
+  .side-sec{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9;}
+  .side-list{list-style:none;margin:0;padding:4px}
+  .side-list a{display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:8px; cursor:pointer; font-size:12px; color:var(--sidebarText); text-decoration:none}
+  .side-list a:hover{background:rgba(255,255,255,.06)}
+  .side-list a.active{background:rgba(255,255,255,.12)}
+
+  /* Main */
+  .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+  header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+  .wrap{max-width:var(--wrapW); margin:0 auto; padding:6px 10px;}
+  .head-top{display:grid; grid-template-columns: 1fr auto auto; align-items:center; column-gap:12px; row-gap:6px;}
+  .title{font-size:16px; font-weight:700; margin:0;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-self:end;}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+  .role{font-weight:700}
+  .login{display:flex; align-items:center; gap:6px;}
+  .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
+  .logout-btn{background:#fff; color:#111; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer}
+  .logout-btn:hover{background:#f8fafc}
+
+  /* Toolbar */
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 0 2px 0; font-size:12px}
+  .toolbar input,.toolbar select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff;}
+  .toolbar .spacer{flex:1 1 auto}
+  .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .btn.danger{background:var(--danger); color:#fff; border-color:var(--danger-2)}
+  .pill{border-radius:999px; border:1px solid var(--line); padding:2px 6px; font-size:11px; background:#fff;}
+  .link{color:#1d4ed8; text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; font:inherit;}
+
+  /* Layout content */
+  .content{flex:1 1 auto; display:flex; flex-direction:column;}
+  .panel{flex:1 1 auto; background:#fff; border:1px solid var(--line); border-radius:0; margin:0; width:100%; max-width:none; display:flex; overflow:hidden;}
+  .split{display:grid; grid-template-columns: 360px 1fr; gap:0; width:100%; height:100%;}
+  .left{border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:280px;}
+  .right{display:flex; flex-direction:column; min-width:0;}
+
+  /* SOS list */
+  .list-head{padding:10px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .list{flex:1 1 auto; overflow:auto;}
+  .srow{display:grid; grid-template-columns: 36px 1fr auto; gap:10px; padding:10px; border-bottom:1px solid #f1f5f9; cursor:pointer;}
+  .srow:hover{background:#f8fafc}
+  .srow.active{background:#fef2f2}
+  .icon{width:36px; height:36px; border-radius:999px; background:#fee2e2; color:#b91c1c; display:flex; align-items:center; justify-content:center; font-weight:900;}
+  .sname{font-weight:800}
+  .smeta{font-size:12px; color:#475569}
+  .sstatus{font-size:12px; white-space:nowrap;}
+  .status-open{color:#b91c1c; font-weight:800}
+  .status-handling{color:#b45309; font-weight:800}
+  .status-closed{color:#16a34a; font-weight:800}
+
+  /* Detail */
+  .detail-head{padding:12px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .detail-body{flex:1 1 auto; overflow:auto; padding:12px; background:#f8fafc;}
+  .box{border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px; margin-bottom:10px;}
+  .grid{display:grid; grid-template-columns:140px 1fr 140px 1fr; gap:10px 12px; align-items:center;}
+  .ilabel{color:#475569; font-size:12px;}
+  .ivalue{font-size:13px;}
+  .map{height:280px; border-radius:12px; background:
+      repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 10px,#f8fafc 10px,#f8fafc 20px);
+      border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:#64748b; font-size:12px;}
+  .ops{display:flex; gap:8px; flex-wrap:wrap;}
+
+  /* ===== Global SOS Notifier (共通バナー) ===== */
+  .sos-banner{position:fixed; inset:0 0 auto 0; height:64px; display:none; align-items:center; justify-content:center;
+    background:linear-gradient(90deg,#7f1d1d,#dc2626,#b91c1c); color:#fff; z-index:999999; box-shadow:0 4px 20px rgba(0,0,0,.35);}
+  .sos-banner .inner{display:flex; align-items:center; gap:12px; font-weight:900; letter-spacing:.05em;}
+  .sos-banner .msg{font-size:16px;}
+  .sos-banner .btn{padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.6); background:rgba(255,255,255,.12); color:#fff; cursor:pointer;}
+  .flash{animation:flash 1s infinite alternate ease-in-out;}
+  @keyframes flash { from {opacity:1; transform:scale(1);} to {opacity:.6; transform:scale(1.02);} }
+  .shake{animation:shake .5s infinite;}
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+
+  /* ===== Cast Profile Modal ===== */
+  .modal{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:9999}
+  .modal-content{background:#fff; border:1px solid #eef2f7; box-shadow:var(--shadow); width:96%; max-width:880px; max-height:92vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden;}
+  .modal-header{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line);}
+  .modal-title{font-weight:800; font-size:16px;}
+  .m-body{flex:1 1 auto; overflow:auto; padding:12px; background:#fafafa;}
+  .cast-grid{display:grid; grid-template-columns: 220px 1fr; gap:12px;}
+  .cast-card{border:1px solid var(--line); border-radius:12px; background:#fff; padding:10px;}
+  .avatar{width:100%; aspect-ratio:3/4; border-radius:10px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; color:#64748b;}
+  .cast-info{display:grid; grid-template-columns:140px 1fr 140px 1fr; gap:10px 12px; align-items:center;}
+</style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo"><a href="dashboard.html" aria-label="Dashboard Top"><img src="img/logo4.png" alt="LOGO"/></a></div>
+
+    <div class="side-group">
+      <div class="side-sec">運用機能</div>
+      <ul class="side-list">
+        <li><a href="dashboard.html">ダッシュボード</a></li>
+        <li><a href="schedule.html">スケジュール</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">管理機能</div>
+      <ul class="side-list">
+        <li><a href="cast.html">キャスト管理</a></li>
+        <li><a href="shops.html">店舗管理</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">通信機能</div>
+      <ul class="side-list">
+        <li><a href="chat.html">チャット（LINE）</a></li>
+        <li><a class="active" href="sos.html">SOSアラート</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">設定機能</div>
+      <ul class="side-list">
+        <li><a href="request.html">申請・承認</a></li>
+        <li><a href="setting.html">設定</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ===== Global SOS Notifier（全ページ共通バナー） ===== -->
+  <div id="sosBanner" class="sos-banner flash shake" role="alert" aria-live="assertive">
+    <div class="inner">
+      <span style="font-size:20px;">🚨 SOS</span>
+      <span class="msg" id="sosBannerMsg">キャストからSOSを受信！至急確認してください！</span>
+      <button class="btn" id="sosOpenBtn">開く</button>
+      <button class="btn" id="sosMuteBtn">停止</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="head-top">
+          <h1 class="title">SOSアラート</h1>
+          <div></div>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span> <span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="logout-btn" onclick="location.href='index.html'">ログアウト</button>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <input id="q" type="text" placeholder="キャスト名・メモで検索" style="min-width:240px">
+          <select id="ownerFilter">
+            <option value="">担当者（すべて）</option>
+            <option value="tanaka">田中</option>
+            <option value="sato">佐藤</option>
+            <option value="suzuki">鈴木</option>
+          </select>
+          <select id="statusFilter">
+            <option value="">ステータス（すべて）</option>
+            <option value="OPEN">未対応</option>
+            <option value="HANDLING">対応中</option>
+            <option value="CLOSED">クローズ</option>
+          </select>
+          <div class="spacer"></div>
+          <button class="btn danger" id="testSOS">テストSOS発報</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="panel">
+        <div class="split">
+          <!-- 左：SOS一覧 -->
+          <aside class="left">
+            <div class="list-head">
+              <span class="pill">総件数 <b id="totalCnt">0</b></span>
+              <span class="pill" style="border-color:#fecaca;background:#fff5f5;">未対応 <b id="openCnt">0</b></span>
+              <span class="pill">対応中 <b id="handlingCnt">0</b></span>
+              <span class="pill" style="border-color:#bbf7d0;background:#f0fdf4;">クローズ <b id="closedCnt">0</b></span>
+            </div>
+            <div id="sosList" class="list"></div>
+          </aside>
+
+          <!-- 右：詳細 -->
+          <section class="right">
+            <div class="detail-head">
+              <div>
+                <div class="sname" id="detailName">未選択</div>
+                <div class="smeta" id="detailMeta">左の一覧から選択してください</div>
+              </div>
+              <div class="ops">
+                <button class="btn" id="btnHandling">対応中にする</button>
+                <button class="btn" id="btnClose">クローズ</button>
+                <a id="btnMap" class="btn primary" href="#" target="_blank" rel="noopener">Googleマップ</a>
+              </div>
+            </div>
+            <div class="detail-body">
+              <div class="box">
+                <div class="grid">
+                  <div class="ilabel">キャスト名</div><div class="ivalue" id="dCast"></div>
+                  <div class="ilabel">担当者</div><div class="ivalue" id="dOwner"></div>
+                  <div class="ilabel">発報時刻</div><div class="ivalue" id="dTime"></div>
+                  <div class="ilabel">状態</div><div class="ivalue" id="dStatus"></div>
+                </div>
+              </div>
+              <div class="box">
+                <div class="ilabel" style="font-weight:700">テキスト</div>
+                <div class="ivalue" id="dText" style="white-space:pre-wrap; margin-top:6px;"></div>
+              </div>
+              <div class="box">
+                <div class="ilabel" style="font-weight:700">位置情報</div>
+                <div class="map" id="dMap">Map Placeholder（実装時は地図SDKを表示）</div>
+                <div class="smeta" id="dLatLng" style="margin-top:6px;"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Cast Profile Modal ===== -->
+  <div id="castModal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="castTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="castTitle">キャスト詳細</div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeCastModal()">閉じる</button>
+        </div>
+      </div>
+      <div class="m-body">
+        <div class="cast-grid">
+          <div class="cast-card">
+            <div id="castAvatar" class="avatar">No Image</div>
+          </div>
+          <div class="cast-card">
+            <div class="cast-info">
+              <div class="ilabel">名前</div><div class="ivalue" id="cName"></div>
+              <div class="ilabel">年齢</div><div class="ivalue" id="cAge"></div>
+              <div class="ilabel">電話</div><div class="ivalue" id="cPhone"></div>
+              <div class="ilabel">LINE</div><div class="ivalue" id="cLine"></div>
+              <div class="ilabel">担当者</div><div class="ivalue" id="cOwner"></div>
+              <div class="ilabel">タグ</div><div class="ivalue" id="cTags"></div>
+              <div class="ilabel">メモ</div><div class="ivalue" id="cMemo" style="white-space:pre-wrap;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ===== デモ用データ ===== */
+const STAFFS = { tanaka:{id:'tanaka',name:'田中'}, sato:{id:'sato',name:'佐藤'}, suzuki:{id:'suzuki',name:'鈴木'} };
+const CAST_NAMES  = ["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ここ","れい","しおり","りか","みお","ゆか","なつ","しずく","みく","あや","ゆう","まこ"];
+function pad2(n){return String(n).padStart(2,'0')}
+function fmtDT(d){return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`}
+function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
+
+/* ダミーのキャスト詳細マスタ */
+const CAST_MASTER = {};
+for(const name of CAST_NAMES){
+  const age = rand(18,32);
+  const phone = `080-${rand(1000,9999)}-${rand(1000,9999)}`;
+  const line = `${name}_line`;
+  const owner = pick(Object.keys(STAFFS));
+  const tags = pick([["飲酒OK","送迎あり"],["飲酒NG","送迎なし"],["飲酒OK","送迎なし"],["飲酒NG","送迎あり"]]);
+  const memo = pick(["","","",""]);
+  const img = null; // 画像パスがあれば指定（例: `img/cast1.jpg`）
+  CAST_MASTER[name] = {name, age, phone, line, owner, tags, memo, img};
+}
+
+/* ===== 状態 ===== */
+let state = {
+  login:{role:"ADMIN", user:"admin"},
+  filter:{q:"", owner:"", status:""},
+  activeId:null,
+  list:[] // {id, cast, owner, text, lat, lng, at, status}
+};
+
+/* ===== ログイン切替 ===== */
+const loginSelect = document.getElementById('loginSelect');
+loginSelect.addEventListener('change', ()=>{
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+  document.getElementById('roleBadge').textContent=(role==="ADMIN"?"管理者":"担当者");
+  renderList();
+  applyDetailPermission();
+});
+
+/* ===== ツールバー フィルタ ===== */
+q.addEventListener('input', ()=>{ state.filter.q=q.value.trim(); renderList(); });
+ownerFilter.addEventListener('change', ()=>{ state.filter.owner=ownerFilter.value; renderList(); });
+statusFilter.addEventListener('change', ()=>{ state.filter.status=statusFilter.value; renderList(); });
+
+/* ===== リスト描画 ===== */
+function filtered(){
+  let arr = state.list.slice().sort((a,b)=> b.at-a.at);
+  if(state.login.role==="STAFF") arr = arr.filter(x=>x.owner===state.login.user);
+  if(state.filter.owner) arr = arr.filter(x=>x.owner===state.filter.owner);
+  if(state.filter.status) arr = arr.filter(x=>x.status===state.filter.status);
+  const qk=(state.filter.q||"").toLowerCase().normalize("NFKC");
+  if(qk) arr = arr.filter(x=> (x.cast + " " + x.text).toLowerCase().normalize("NFKC").includes(qk));
+  return arr;
+}
+function renderList(){
+  const list = filtered();
+  document.getElementById('totalCnt').textContent = list.length;
+  document.getElementById('openCnt').textContent = list.filter(x=>x.status==='OPEN').length;
+  document.getElementById('handlingCnt').textContent = list.filter(x=>x.status==='HANDLING').length;
+  document.getElementById('closedCnt').textContent = list.filter(x=>x.status==='CLOSED').length;
+
+  const el = document.getElementById('sosList');
+  if(list.length===0){ el.innerHTML='<div style="padding:18px; color:#94a3b8;">該当アラートはありません</div>'; clearDetail(); return; }
+  el.innerHTML = list.map(x=>`
+    <div class="srow ${state.activeId===x.id?'active':''}" data-id="${x.id}">
+      <div class="icon">SOS</div>
+      <div>
+        <div class="sname"><button class="link cast-link" data-cast="${x.cast}" onclick="event.stopPropagation(); openCastModal('${x.cast}')">${x.cast} さん</button></div>
+        <div class="smeta">担当: ${STAFFS[x.owner].name} / ${fmtDT(x.at)} / ${x.text.slice(0,40)}</div>
+      </div>
+      <div class="sstatus ${x.status==='OPEN'?'status-open':x.status==='HANDLING'?'status-handling':'status-closed'}">${x.status}</div>
+    </div>
+  `).join('');
+}
+sosList.addEventListener('click', (e)=>{
+  const row=e.target.closest('.srow'); if(!row) return;
+  openDetail(row.getAttribute('data-id'));
+});
+
+/* ===== 詳細表示・操作 ===== */
+function openDetail(id){
+  state.activeId=id;
+  const x=state.list.find(a=>a.id===id); if(!x) return;
+  document.getElementById('detailName').innerHTML = `<button class="link" onclick="openCastModal('${x.cast}')">${x.cast} さん</button>のSOS`;
+  document.getElementById('detailMeta').textContent = `${fmtDT(x.at)} / ステータス: ${x.status}`;
+  dCast.innerHTML = `<button class="link" onclick="openCastModal('${x.cast}')">${x.cast}</button>`;
+  dOwner.textContent = STAFFS[x.owner].name;
+  dTime.textContent = fmtDT(x.at);
+  dStatus.textContent = x.status;
+  dText.textContent = x.text || "(本文なし)";
+  dLatLng.textContent = `lat: ${x.lat.toFixed(6)} / lng: ${x.lng.toFixed(6)}`;
+  btnMap.href = `https://www.google.com/maps?q=${x.lat},${x.lng}`;
+  applyDetailPermission();
+  renderList();
+}
+function clearDetail(){
+  state.activeId=null;
+  detailName.textContent="未選択";
+  detailMeta.textContent="左の一覧から選択してください";
+  dCast.textContent=dOwner.textContent=dTime.textContent=dStatus.textContent=dText.textContent=dLatLng.textContent="";
+  btnMap.href="#";
+}
+function applyDetailPermission(){
+  const x = state.list.find(a=>a.id===state.activeId);
+  const canOp = x && (state.login.role==="ADMIN" || state.login.user===x.owner);
+  btnHandling.disabled = !canOp; btnClose.disabled = !canOp;
+  btnHandling.title = btnClose.title = canOp ? "" : "担当外は操作できません";
+}
+btnHandling.addEventListener('click', ()=>{
+  const x=state.list.find(a=>a.id===state.activeId); if(!x) return;
+  x.status='HANDLING'; openDetail(x.id);
+});
+btnClose.addEventListener('click', ()=>{
+  const x=state.list.find(a=>a.id===state.activeId); if(!x) return;
+  x.status='CLOSED'; openDetail(x.id);
+});
+
+/* ===== Global SOS Notifier（全ページ共通バナー＆音） ===== */
+const sosBanner = document.getElementById('sosBanner');
+const sosBannerMsg = document.getElementById('sosBannerMsg');
+const sosOpenBtn = document.getElementById('sosOpenBtn');
+const sosMuteBtn = document.getElementById('sosMuteBtn');
+let sosOsc=null, sosCtx=null, sosMuted=false;
+
+function playSosTone(){
+  try{
+    if(sosMuted) return;
+    sosCtx = sosCtx || new (window.AudioContext||window.webkitAudioContext)();
+    sosOsc = sosCtx.createOscillator();
+    const gain = sosCtx.createGain();
+    sosOsc.frequency.value=880;
+    sosOsc.type="square";
+    gain.gain.value=0.05;
+    sosOsc.connect(gain).connect(sosCtx.destination);
+    sosOsc.start();
+  }catch(e){}
+}
+function stopSosTone(){ try{ if(sosOsc){ sosOsc.stop(); sosOsc.disconnect(); sosOsc=null; } }catch(e){} }
+
+function showSosBanner(payload){
+  sosBannerMsg.textContent = `🚨 ${payload.cast} さんがSOS発報（担当: ${STAFFS[payload.owner].name}）`;
+  sosBanner.style.display='flex';
+  playSosTone();
+}
+function hideSosBanner(){ sosBanner.style.display='none'; stopSosTone(); }
+
+sosOpenBtn.addEventListener('click', ()=>{ hideSosBanner(); });
+sosMuteBtn.addEventListener('click', ()=>{ sosMuted=true; hideSosBanner(); });
+
+/* 受信：localStorageイベントで他タブからも通知 */
+window.addEventListener('storage', (e)=>{
+  if(e.key==='sos_broadcast' && e.newValue){
+    const data = JSON.parse(e.newValue);
+    receiveSOS(data);
+  }
+});
+
+/* ===== 受信 → 画面反映 ===== */
+function receiveSOS(data){
+  state.list.push(data);
+  showSosBanner(data);
+  renderList();
+  openDetail(data.id);
+}
+
+/* ===== Cast Modal ===== */
+function openCastModal(name){
+  const c = CAST_MASTER[name];
+  if(!c){ return; }
+  castTitle.textContent = `キャスト詳細（${c.name}）`;
+  if(c.img){
+    castAvatar.innerHTML = `<img src="${c.img}" alt="${c.name}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+  }else{
+    castAvatar.textContent = 'No Image';
+  }
+  cName.textContent = c.name;
+  cAge.textContent = `${c.age} 歳`;
+  cPhone.textContent = c.phone;
+  cLine.textContent = c.line;
+  cOwner.textContent = STAFFS[c.owner]?.name || '-';
+  cTags.textContent = Array.isArray(c.tags) ? c.tags.join(' / ') : '-';
+  cMemo.textContent = c.memo || '—';
+  document.getElementById('castModal').style.display='flex';
+}
+function closeCastModal(){ document.getElementById('castModal').style.display='none'; }
+
+/* ===== デモ：テストSOS発報（全タブに配信） ===== */
+testSOS.addEventListener('click', ()=>{
+  const now=new Date();
+  const person = pick(CAST_NAMES);
+  const payload = {
+    id:'sos-'+now.getTime(),
+    cast: person,
+    owner: CAST_MASTER[person].owner,
+    text: pick(['助けてください','至急連絡お願いします','タクシーでトラブル','体調が悪い','お客様とトラブル']),
+    lat: 35.68 + Math.random()*0.04, lng: 139.76 + Math.random()*0.04,
+    at: now, status:'OPEN'
+  };
+  receiveSOS(payload);
+  try{ localStorage.setItem('sos_broadcast', JSON.stringify(payload)); }catch(e){}
+});
+
+/* ===== 初期化 ===== */
+(function init(){
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+  document.getElementById('roleBadge').textContent=(role==="ADMIN"?"管理者":"担当者");
+  renderList();
+})();
+</script>
+</body>
+</html>

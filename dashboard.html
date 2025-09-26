@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>当日出勤ダッシュボード（試作 v3.3-edge / header-pager / dense-4rows）</title>
+  <style>
+    :root{
+      --gap:6px;
+      --radius:10px;
+      --bg:#f7f7f8;
+      --panel:#ffffff;
+      --text:#222;
+      --muted:#667085;
+      --line:#e5e7eb;
+      --accent:#2563eb;
+      --accent-weak:#e0e7ff;
+      --sidebar:#0f172a;
+      --sidebarText:#e2e8f0;
+      --sidebarW: 160px;
+      --wrapW: 1160px;
+      --cardH: 165px;
+      --shadow:0 8px 24px rgba(16,24,40,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+    /* ==== Sidebar ==== */
+    .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+    .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 6px;}
+    .side-logo img{width:86%; height:auto; object-fit:contain}
+    .side-head{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9}
+    .side-list{list-style:none;margin:0;padding:4px}
+    .side-list li{margin:0; padding:0}
+    .side-list a{display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:8px; cursor:pointer; font-size:12px; color:var(--sidebarText); text-decoration:none}
+    .side-list a:hover{background:rgba(255,255,255,.06)}
+    .side-list a.active{background:rgba(255,255,255,.12)}
+    /* 追加: グループ見出し用 */
+    .side-group{margin-bottom:8px;}
+    .side-sec{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9;}
+
+    /* ==== Main & Header ==== */
+    .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+    header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+    .wrap{max-width:var(--wrapW); margin:0 auto; padding:6px 10px;}
+
+    .head-top{display:grid; grid-template-columns: 1fr auto auto; align-items:center; column-gap:12px; row-gap:6px;}
+    .title{font-size:16px; font-weight:700; margin:0;}
+    .head-center{display:flex; justify-content:center;}
+    .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-self:end;}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+    .role{font-weight:700}
+    .login{display:flex; align-items:center; gap:6px;}
+    .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+    .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
+    .logout-btn{background:#fff; color:#111827; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer}
+
+    .counters{display:flex; gap:8px; flex-wrap:wrap;}
+    .counter{background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 10px; font-size:12px; white-space:nowrap;}
+
+    /* ==== Toolbar ==== */
+    .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 0 2px 0; font-size:12px}
+    .toolbar input[type="text"], .toolbar select{border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 8px; font-size:12px;}
+    .radios{display:flex; align-items:center; gap:8px;}
+    .radios label{display:flex; align-items:center; gap:4px;}
+    .filters{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+    .chip{border:1px solid var(--line); background:#fff; padding:6px 10px; border-radius:999px; cursor:pointer;}
+    .chip.active{background:var(--accent); color:#fff; border-color:var(--accent)}
+    .spacer{flex:1 1 auto}
+
+    /* ==== Header Pager ==== */
+    .pager{display:flex; align-items:center; gap:6px; margin-left:6px; white-space:nowrap;}
+    .pager button{border:1px solid var(--line); background:#fff; border-radius:8px; padding:4px 8px; cursor:pointer}
+    .pager .page{min-width:64px; text-align:center;}
+    .pager .count{color:var(--muted); margin-left:4px;}
+
+    /* ==== Board ==== */
+    .content{flex:1 1 auto; display:flex; flex-direction:column;}
+    .panel{
+      flex:1 1 auto; background:#fff; border:1px solid var(--line);
+      border-radius:0; padding:10px 10px 0 10px; margin:0; width:100%; max-width:none;
+      display:flex; flex-direction:column;
+    }
+    .grid-wrap{flex:1 1 auto; overflow:hidden; padding:2px 2px 6px;}
+    .grid{display:grid; grid-template-columns:repeat(9,1fr); grid-auto-rows:var(--cardH); gap:var(--gap); height:100%;}
+
+    /* ==== Card ==== */
+    .card{background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; user-select:none; transition:box-shadow .15s ease;}
+    .card:hover{box-shadow:var(--shadow)}
+    .photo{position:relative; height:60%;}
+    .photo-inner{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:#ddd;}
+    .photo-inner img{width:100%; height:100%; object-fit:cover}
+    .mark{position:absolute; top:4px; left:4px; background:rgba(255,255,255,.92); border:1px solid var(--line); padding:2px 6px; border-radius:999px; font-weight:700;}
+    .text{height:40%; display:flex; flex-direction:column; padding:4px 6px; gap:2px; border-top:1px solid var(--line)}
+    .name{font-weight:700; font-size:12.5px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .meta{display:flex; flex-direction:column; gap:1px; font-size:11.5px; color:var(--text)}
+    .meta .line{display:flex; align-items:center; gap:4px;}
+    .label{color:var(--muted)}
+    .value{font-variant-numeric:tabular-nums}
+
+    /* ==== Drop Zone ==== */
+    .dropcol{grid-column: 9 / span 1; grid-row: 1 / span 4; display:flex; flex-direction:column; border:1px dashed var(--line); border-radius:10px; padding:10px; background:#fafafa;}
+    .drop-head{display:flex; flex-direction:column; gap:6px; margin-bottom:8px;}
+    .drop-zone{flex:1 1 auto; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; padding:8px; overflow:auto;}
+    .drop-zone.over{background:#f8fafc; border-color:#94a3b8}
+    .chip-name{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; margin-bottom:6px; font-size:12px;}
+    .chip-name .remove{cursor:pointer; border:none; background:#fee2e2; border:1px solid #fecaca; padding:0 6px; border-radius:6px;}
+    .drop-actions{display:flex; gap:8px; margin-top:8px;}
+    .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer}
+    .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+
+    /* ==== 共通モーダル ==== */
+    .modal{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:50}
+    .modal-content{background:#fff; padding:18px; border-radius:16px; max-width:980px; width:92%; border:1px solid #eef2f7; box-shadow:var(--shadow); }
+    .modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+    .modal-title{font-weight:800; font-size:16px; letter-spacing:.02em}
+    .modal-inner{display:grid; grid-template-columns:1.1fr 340px; gap:18px; align-items:start}
+
+    /* ==== キャスト詳細（右側スライダー含む） ==== */
+    .info{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px;}
+    .grid-info{display:grid; grid-template-columns:140px 1fr; row-gap:8px; column-gap:10px; align-items:center;}
+    .grid-info .ilabel{color:#475569; font-size:12px; letter-spacing:.02em}
+    .grid-info .ivalue{font-size:13px; padding:6px 10px; background:#f8fafc; border:1px solid #eef2f7; border-radius:8px;}
+    .pill{display:inline-flex; gap:6px; align-items:center; padding:3px 8px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; font-size:12px;}
+    .ivalue .pill.ok{background:#ecfdf5; border-color:#a7f3d0;}
+    .ivalue .pill.no{background:#fef2f2; border-color:#fecaca;}
+    .slider{position:relative; width:100%; aspect-ratio:3/4; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb; background:#f3f4f6;}
+    .slider img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:opacity .25s ease;}
+    .slider .nav{position:absolute; inset:auto 8px 8px 8px; display:flex; justify-content:center; gap:6px;}
+    .dot{width:8px; height:8px; border-radius:999px; background:#e5e7eb; border:1px solid #cbd5e1; opacity:.9}
+    .dot.active{background:#2563eb; border-color:#2563eb}
+    .sbtn{position:absolute; top:50%; transform:translateY(-50%); border:none; background:rgba(255,255,255,.9); border:1px solid #e5e7eb; width:32px; height:32px; border-radius:999px; cursor:pointer; }
+    .sbtn:hover{background:#fff}
+    .sbtn.prev{left:8px}
+    .sbtn.next{right:8px}
+
+    /* ==== 店舗モーダル（拡大3列） ==== */
+    .shop-toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;}
+    .shop-toolbar input[type="text"], .shop-toolbar select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:12px; background:#fff}
+    .shop-modal-body{max-height:62vh; overflow:auto;}
+    .shop-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    @media (max-width: 720px){ .shop-grid{grid-template-columns:1fr;} }
+    .shop-card{border:1px solid #eef2f7; border-radius:12px; padding:10px; background:#fff; cursor:pointer; transition:box-shadow .15s ease, transform .04s ease;}
+    .shop-card:hover{background:#f8fafc; box-shadow:var(--shadow)}
+    .shop-card:active{transform:scale(0.998)}
+    .shop-top{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;}
+    .shop-name{font-weight:800; font-size:14px; line-height:1.2;}
+    .shop-cat{font-size:11px; color:#334155; background:#f1f5f9; border:1px solid #e2e8f0; padding:2px 6px; border-radius:999px; white-space:nowrap;}
+    .shop-addr{color:#64748b; font-size:12px; margin-bottom:6px;}
+    .shop-id{font-size:12px; color:#0f172a; opacity:.8;}
+#shopModal .modal-content{ max-width: 1320px; width: 96%; }
+#shopModal .shop-modal-body{ max-height: 72vh; }
+#shopModal .shop-grid{ grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 1280px){ #shopModal .shop-grid{ grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px){ #shopModal .shop-grid{ grid-template-columns: 1fr; } }
+  /* ===== Global SOS Notifier ===== */
+.sos-banner{
+  position:fixed; inset:0 0 auto 0; height:64px;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(90deg,#7f1d1d,#dc2626,#b91c1c);
+  color:#fff; z-index:999999; box-shadow:0 4px 20px rgba(0,0,0,.35);
+}
+.sos-banner .inner{display:flex; align-items:center; gap:12px; font-weight:900; letter-spacing:.05em;}
+.sos-banner .msg{font-size:16px;}
+/* 既存の .btn が無いページ向けの軽いフォールバック */
+.sos-banner .btn{padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.6); background:rgba(255,255,255,.12); color:#fff; cursor:pointer;}
+.flash{animation:flash 1s infinite alternate ease-in-out;}
+@keyframes flash { from {opacity:1; transform:scale(1);} to {opacity:.6; transform:scale(1.02);} }
+.shake{animation:shake .5s infinite;}
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo"><a href="dashboard.html" aria-label="Dashboard Top"><img src="img/logo4.png" alt="LOGO"/></a></div>
+
+    <div class="side-group">
+      <div class="side-sec">運用機能</div>
+      <ul class="side-list">
+        <li><a href="dashboard.html">ダッシュボード</a></li>
+        <li><a href="schedule.html">スケジュール</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">管理機能</div>
+      <ul class="side-list">
+        <li><a href="cast.html">キャスト管理</a></li>
+        <!-- 固定 active を削除 -->
+        <li><a href="shops.html">店舗管理</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">通信機能</div>
+      <ul class="side-list">
+        <li><a href="chat.html">チャット（LINE）</a></li>
+        <li><a href="sos.html">SOSアラート</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">設定機能</div>
+      <ul class="side-list">
+        <li><a href="request.html">申請・承認</a></li>
+        <li><a href="setting.html">設定</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ===== Global SOS Notifier（全ページ共通バナー） ===== -->
+  <div id="sosBanner" class="sos-banner flash shake" role="alert" aria-live="assertive">
+    <div class="inner">
+      <span style="font-size:20px;">🚨 SOS</span>
+      <span class="msg" id="sosBannerMsg">キャストからSOSを受信！至急確認してください！</span>
+      <button class="btn" id="sosOpenBtn">開く</button>
+      <button class="btn" id="sosMuteBtn">停止</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="head-top">
+          <h1 class="title">当日出勤ダッシュボード（試作）</h1>
+          <div class="head-center">
+            <div class="counters">
+              <div class="counter">本日の出勤：<b id="cntToday">0</b> 名</div>
+              <div class="counter">配置済み：<b id="cntAssigned">0</b> 名</div>
+              <div class="counter">明日の出勤予定：<b id="cntTomorrow">0</b> 名</div>
+            </div>
+          </div>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span><span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+            <button class="logout-btn" onclick="location.href='index.html'">ログアウト</button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <input id="q" type="text" placeholder="キーワード（名前）" style="min-width:220px"/>
+          <select id="owner"><option value="">担当者（すべて）</option><option>田中</option><option>佐藤</option><option>鈴木</option></select>
+
+          <div class="radios" id="sortRadios">
+            <label><input type="radio" name="sortBy" value="kana" checked /> 50音順</label>
+            <label><input type="radio" name="sortBy" value="wage" /> 時給順</label>
+            <label><input type="radio" name="sortBy" value="age" /> 年齢順</label>
+          </div>
+
+          <div class="filters">
+            <button class="chip active" data-filter="today" onclick="setFilter(this)">本日出勤</button>
+            <button class="chip" data-filter="notToday" onclick="setFilter(this)">本日未出勤</button>
+            <button class="chip" data-filter="matched" onclick="setFilter(this)">マッチ済み</button>
+          </div>
+
+          <!-- ページ送り -->
+          <div class="pager">
+            <button onclick="prevPage()">&lt;</button>
+            <span class="page" id="pageTop">1 / 1</span>
+            <button onclick="nextPage()">&gt;</button>
+            <span class="count" id="countTop">全 0 名</span>
+          </div>
+
+          <div class="spacer"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Board -->
+    <div class="content">
+      <div class="panel">
+        <div class="grid-wrap">
+          <div id="board" class="grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cast Modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">キャスト詳細</div>
+        <button class="btn" onclick="closeModal()">× 閉じる</button>
+      </div>
+      <div class="modal-inner">
+        <div class="info"><div id="infoGrid" class="grid-info"></div></div>
+        <div>
+          <div class="slider" id="slider">
+            <img id="slideImg" alt="">
+            <button class="sbtn prev" onclick="slidePrev()">‹</button>
+            <button class="sbtn next" onclick="slideNext()">›</button>
+            <div class="nav" id="slideDots"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions" style="display:flex; gap:10px; justify-content:center; margin-top:14px;">
+        <button class="btn">編集</button>
+        <button class="btn primary">登録</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shop Picker Modal -->
+  <div id="shopModal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="shopModalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="shopModalTitle">店舗をセット</div>
+        <div class="shop-toolbar">
+          <input id="shopQuery" type="text" placeholder="店名・ID・番号の一部で検索" />
+          <select id="shopCategory">
+            <option value="">（カテゴリ：すべて）</option>
+            <option>クラブ</option>
+            <option>ラウンジ</option>
+            <option>ガールズバー</option>
+          </select>
+          <button class="btn" onclick="closeShopModal()">× 閉じる</button>
+        </div>
+      </div>
+      <div class="shop-modal-body">
+        <div id="shopGrid" class="shop-grid"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ====== 画像（.jpg 10枚） ====== */
+const CAST_IMAGES = Array.from({length: 10}, (_, i) => `img/cast${i+1}.jpg`);
+
+/* ====== デモ用 500店舗を自動生成 ====== */
+const CATS = ["クラブ","ラウンジ","ガールズバー"];
+const DRINKS = ["o","d","x"];
+function pad3(n){ return String(n).padStart(3,"0"); }
+const SHOPS = Array.from({length:500}, (_,i)=>{
+  const idx = i+1;
+  const code = pad3(idx);
+  const id = "shop-" + code;
+  const cat = CATS[i % CATS.length];
+  const name = `${cat} デモ店舗 ${code}`;
+  const addr = `東京都サンプル区${Math.ceil(idx/10)}丁目 ${idx%10+1}-${(idx%5)+1}-${(idx%3)+1}`;
+  const drink = DRINKS[i % DRINKS.length];
+  const need = 3 + (i % 4);
+  return { id, code, name, cat, addr, req:{drink}, need };
+});
+
+/* ====== サンプルキャスト ====== */
+const NAMES=["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ことね","まこ","はる","まい","めい","ゆめ","ここ","れい","しおり","りん","りか","みお","ゆか","なつ","しずく","つばさ","みく","あや","ゆう","かのん","あんな","まどか","みさ","ののか","はな","ゆな","みこ","もも","かえで","ほのか","あかね","みさき"];
+const OWNERS=["田中","佐藤","鈴木"];
+function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
+function sample(a){return a[Math.floor(Math.random()*a.length)]}
+function kanaKey(s){return s.normalize('NFKC')}
+
+/* ====== ダミーキャスト生成 ====== */
+const ALL=Array.from({length:2000}).map((_,i)=>{
+  const name=NAMES[i%NAMES.length]+(i%10===0?"☆":"");
+  const wage=[3200,3500,3800,4200,4800,5200,6000][i%7];
+  const age=randInt(18,32);
+  const owner=OWNERS[i%OWNERS.length];
+  const drink=DRINKS[i%3];
+  const photos=[ CAST_IMAGES[i%10], CAST_IMAGES[(i+3)%10] ];
+  if(i%4===0) photos.push(CAST_IMAGES[(i+6)%10]);
+
+  const workingToday=i%2===0;
+  const workingTomorrow=i%3===0;
+  const matched=i%13===0;
+  const ngShops=(i%17===0)?[SHOPS[0].id]:[];
+  const todaysShop=workingToday?sample(SHOPS).name:"—";
+  const lastShop=sample(["○○○店","□□□店","△△△店","—"]);
+
+  return {id:i+1,name,wage,age,owner,drink,photos,workingToday,workingTomorrow,matched,ngShops,todaysShop,lastShop};
+});
+
+/* ====== 状態 ====== */
+let state={
+  page:1,filter:"today",sortBy:"kana",
+  login:{role:"ADMIN",user:"admin"},
+  owner:"",q:"",shopId:"",cart:[],
+  shopQuery:"", shopCategory:""
+};
+
+/* ====== 共通 ====== */
+function fmtYen(n){return "¥"+n.toLocaleString()}
+function drinkMark(d){return d==="o"?"○":(d==="d")?"△":"×"}
+function matchByShop(cast,shop){
+  if(!shop) return true;
+  if(cast.ngShops?.includes(shop.id)) return false;
+  const req=shop.req?.drink||"x";
+  if(req==="o") return cast.drink==="o";
+  if(req==="d") return cast.drink==="o"||cast.drink==="d";
+  return true;
+}
+
+/* ====== 追加: ログイン→担当者名ユーティリティ & 担当者ドロップ制御 ====== */
+function loginUserToName(user){
+  return user==="tanaka" ? "田中" : user==="sato" ? "佐藤" : "鈴木";
+}
+function updateOwnerOptionsByRole(){
+  const ownerSel = document.getElementById('owner');
+  if(!ownerSel) return;
+  const { role, user } = state.login;
+  const myName = loginUserToName(user);
+
+  Array.from(ownerSel.options).forEach(opt=>{
+    if(role === "ADMIN"){
+      opt.disabled = false;
+    }else{
+      opt.disabled = (opt.value !== myName); // 自分以外と（すべて）を非活性
+    }
+  });
+
+  if(role === "STAFF"){
+    ownerSel.value = myName;
+    state.owner = myName;
+  }
+}
+
+/* ====== ヘッダー操作 ====== */
+loginSelect.addEventListener('change', ()=>{
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+
+  document.getElementById('roleBadge').textContent=(role==="ADMIN"?"管理者":"担当者");
+
+  // ツールバーは常に表示
+  document.getElementById('owner').parentElement.style.display="flex";
+
+  updateOwnerOptionsByRole();
+
+  if(role==="STAFF"){
+    const me=loginUserToName(user);
+    state.owner=me;
+  }
+
+  state.page=1;
+  render();
+});
+
+document.getElementById('sortRadios').addEventListener('change',(e)=>{ if(e.target.name==="sortBy"){ state.sortBy=e.target.value; state.page=1; render(); }});
+document.getElementById('q').addEventListener('input',(e)=>{ state.q=e.target.value.trim(); state.page=1; render(); });
+
+/* 担当者セレクト: スタッフは自分以外へ変更させない */
+document.getElementById('owner').addEventListener('change',(e)=>{
+  if(state.login.role === "STAFF"){
+    const myName = loginUserToName(state.login.user);
+    if(e.target.value !== myName){
+      e.target.value = myName;
+    }
+    state.owner = myName;
+  }else{
+    state.owner = e.target.value;
+  }
+  state.page=1; render();
+});
+
+function setFilter(btn){ document.querySelectorAll('.chip[data-filter]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.filter=btn.dataset.filter; state.page=1; render(); }
+
+/* ====== ページャ ====== */
+function prevPage(){ if(state.page>1){ state.page--; render(); } }
+function nextPage(){ const max=Math.max(1, Math.ceil(filtered().length / 32)); if(state.page<max){ state.page++; render(); } }
+
+/* ====== 一覧の絞り込み/並び替え ====== */
+function filtered(){
+  const q=state.q, role=state.login.role, owner=state.owner, shop=SHOPS.find(s=>s.id===state.shopId);
+  let arr=ALL.filter(c=>{
+    if(role==="STAFF"){ const me=loginUserToName(state.login.user); if(c.owner!==me) return false; }
+    else { if(owner && c.owner!==owner) return false; }
+    if(state.filter==="today" && !c.workingToday) return false;
+    if(state.filter==="notToday" && c.workingToday) return false;
+    if(state.filter==="matched" && !c.matched) return false;
+    if(q && !kanaKey(c.name).includes(q)) return false;
+    if(shop && !matchByShop(c,shop)) return false;
+    return true;
+  });
+  if(state.sortBy==="kana") arr.sort((a,b)=>kanaKey(a.name).localeCompare(kanaKey(b.name)));
+  else if(state.sortBy==="wage") arr.sort((a,b)=>b.wage-a.wage);
+  else if(state.sortBy==="age") arr.sort((a,b)=>a.age-b.age);
+  return arr;
+}
+
+/* ====== カウンタ ====== */
+function updateCounters(){
+  const today=ALL.filter(c=>c.workingToday).length;
+  const assigned=ALL.filter(c=>c.matched).length;
+  const tomorrow=ALL.filter(c=>c.workingTomorrow).length;
+  document.getElementById('cntToday').textContent=today;
+  document.getElementById('cntAssigned').textContent=assigned;
+  document.getElementById('cntTomorrow').textContent=tomorrow;
+}
+
+/* ====== DnD ====== */
+function onDragStart(e,id){ e.dataTransfer.setData('text/plain', String(id)); e.dataTransfer.effectAllowed='copy'; }
+function onDragOver(e){ e.preventDefault(); document.getElementById('dropZone').classList.add('over'); }
+function onDragLeave(){ document.getElementById('dropZone').classList.remove('over'); }
+function onDrop(e){ e.preventDefault(); document.getElementById('dropZone').classList.remove('over'); const id=Number(e.dataTransfer.getData('text/plain')); if(!id) return; if(!state.cart.includes(id)){ state.cart.push(id); renderDropList(); } }
+function removeFromCart(id){ state.cart=state.cart.filter(x=>x!==id); renderDropList(); }
+function confirmAssign(){ ALL.forEach(c=>{ if(state.cart.includes(c.id)) c.matched=true; }); state.cart=[]; renderDropList(); render(); alert("割当を確定しました（デモ）"); }
+function renderDropList(){ const box=document.getElementById('dropList'); box.innerHTML=state.cart.map(id=>{ const c=ALL.find(x=>x.id===id); return `<div class="chip-name"><span>${c?.name||id}</span><button class="remove" onclick="removeFromCart(${id})">×</button></div>`; }).join('') || `<div style="color:#94a3b8; font-size:12px;">ここにキャストカードをドラッグ＆ドロップ</div>`; }
+
+/* ====== キャスト詳細モーダル ====== */
+let slider={idx:0,imgs:[]};
+function openModal(id){
+  const c=ALL.find(x=>x.id===id); if(!c) return;
+  const info=[
+    ["氏名",c.name],
+    ["時給",fmtYen(c.wage)],
+    ["年齢",`${c.age} 歳`],
+    ["担当者",c.owner],
+    ["飲酒",`<span class="pill">${drinkMark(c.drink)}</span>`],
+    ["本日出勤",`<span class="pill ${c.workingToday?'ok':'no'}">${c.workingToday?'はい':'いいえ'}</span>`],
+    ["出勤予定",c.workingTomorrow?"明日":"—"],
+    ["NG店舗",(c.ngShops||[]).map(id=>SHOPS.find(s=>s.id===id)?.name||id).join(" / ")||"なし"],
+    ["本日の店舗",c.todaysShop||"—"],
+    ["前回の店舗",c.lastShop||"—"]
+  ];
+  document.getElementById('infoGrid').innerHTML=info.map(([k,v])=>`<div class="ilabel">${k}</div><div class="ivalue">${v}</div>`).join('');
+  slider.imgs=(c.photos&&c.photos.length>0)?c.photos:[""];
+  slider.idx=0; applySlide();
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){ document.getElementById('modal').style.display='none'; }
+function applySlide(){
+  const imgEl=document.getElementById('slideImg');
+  const dots=document.getElementById('slideDots');
+  const src=slider.imgs[slider.idx];
+  imgEl.style.opacity=0;
+  if(src){ imgEl.src=src; imgEl.alt=`photo ${slider.idx+1}`; }
+  else { imgEl.removeAttribute('src'); imgEl.alt='no photo'; imgEl.style.background='#e5e7eb'; }
+  requestAnimationFrame(()=>{ imgEl.style.opacity=1; });
+  dots.innerHTML=slider.imgs.map((_,i)=>`<div class="dot ${i===slider.idx?'active':''}" onclick="slideGoto(${i})"></div>`).join('');
+}
+function slidePrev(){ slider.idx=(slider.idx-1+slider.imgs.length)%slider.imgs.length; applySlide(); }
+function slideNext(){ slider.idx=(slider.idx+1)%slider.imgs.length; applySlide(); }
+function slideGoto(i){ slider.idx=i; applySlide(); }
+
+/* ====== 店舗ピッカーモーダル ====== */
+function openShopModal(){
+  document.getElementById('shopModal').style.display='flex';
+  const qEl = document.getElementById('shopQuery');
+  const cEl = document.getElementById('shopCategory');
+  if(qEl){ qEl.value = state.shopQuery; qEl.focus(); }
+  if(cEl){ cEl.value = state.shopCategory; }
+  renderShopGrid();
+}
+function closeShopModal(){ document.getElementById('shopModal').style.display='none'; }
+
+function selectShop(id){
+  state.shopId = id || "";
+  updateShopReqLabel();
+  closeShopModal();
+  render();
+}
+
+function shopMatches(s, q, cat){
+  if(cat && s.cat!==cat) return false;
+  if(!q) return true;
+  const key = (s.name + s.id + (s.code||"")).toLowerCase();
+  return key.includes(q.toLowerCase());
+}
+
+function renderShopGrid(){
+  const grid = document.getElementById('shopGrid');
+  if(!grid) return;
+  const q = (document.getElementById('shopQuery')?.value || "").trim();
+  const cat = (document.getElementById('shopCategory')?.value || "").trim();
+  state.shopQuery = q; state.shopCategory = cat;
+
+  const list = SHOPS.filter(s=>shopMatches(s,q,cat));
+  grid.innerHTML = list.map(s=>`
+    <div class="shop-card" onclick="selectShop('${s.id}')" title="${s.name}">
+      <div class="shop-top">
+        <div class="shop-name">${s.name}</div>
+        <div class="shop-cat">${s.cat}</div>
+      </div>
+      <div class="shop-addr">${s.addr}</div>
+      <div class="shop-id"><b>${s.id}</b> / ${s.code}</div>
+    </div>
+  `).join('') || `<div class="shop-card" style="cursor:default">該当する店舗がありません</div>`;
+}
+
+/* ==== 要件ラベル＆店舗名（Dropcol） ==== */
+function updateShopReqLabel(){
+  const s = SHOPS.find(x=>x.id===state.shopId);
+  const reqEl = document.getElementById('shopReqLabel');
+  const nameEl = document.getElementById('shopNameLabel');
+
+  if(nameEl) nameEl.textContent = s ? s.name : "未選択";
+
+  if(!reqEl) return;
+  if(!s){ reqEl.textContent="-"; return; }
+
+  const txt = s.req?.drink==="o" ? "○のみ"
+            : s.req?.drink==="d" ? "○/△"
+            : "制約なし";
+  reqEl.textContent = `酒: ${txt}`;
+}
+
+/* ====== レンダリング ====== */
+function render(){
+  updateCounters();
+  const list=filtered();
+  const perCards=32; // 8×4（右端はドロップ列）
+  const maxPage=Math.max(1, Math.ceil(list.length/perCards));
+  if(state.page>maxPage) state.page=maxPage;
+
+  const start=(state.page-1)*perCards;
+  const pageCards=list.slice(start,start+perCards);
+
+  const cardsHtml=pageCards.map(c=>cardHtml(c)).join('');
+
+  const dropHtml=`
+    <div class="dropcol">
+      <div class="drop-head">
+        <div class="badge"><span class="label">店舗:</span><span id="shopNameLabel">未選択</span></div>
+        <div class="badge"><span class="label">要件:</span><span id="shopReqLabel">-</span></div>
+        <button class="btn primary" onclick="openShopModal()">店舗をセット</button>
+      </div>
+
+      <div id="dropZone" class="drop-zone" ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+        <div id="dropList"></div>
+      </div>
+      <div class="drop-actions">
+        <button class="btn" onclick="state.cart=[]; renderDropList()">クリア</button>
+        <button class="btn primary" onclick="confirmAssign()">確定</button>
+      </div>
+    </div>`;
+
+  document.getElementById('board').innerHTML=cardsHtml+dropHtml;
+
+  renderDropList();
+  updateShopReqLabel();
+
+  // 店舗モーダル 入力イベント
+  const qEl = document.getElementById('shopQuery');
+  const cEl = document.getElementById('shopCategory');
+  if(qEl && !qEl._bound){ qEl.addEventListener('input', renderShopGrid); qEl._bound=true; }
+  if(cEl && !cEl._bound){ cEl.addEventListener('change', renderShopGrid); cEl._bound=true; }
+
+  document.getElementById('countTop').textContent=`全 ${list.length} 名`;
+  document.getElementById('pageTop').textContent=`${state.page} / ${maxPage}`;
+}
+
+function cardHtml(d){
+  const mark=drinkMark(d.drink);
+  const first=d.photos?.[0];
+  const img=first?`<img src="${first}" alt="">`:'';
+  return `
+  <div class="card" draggable="true" ondragstart="onDragStart(event, ${d.id})" onclick="openModal(${d.id})">
+    <div class="photo">
+      <span class="mark">${mark}</span>
+      <div class="photo-inner">${img || "PHOTO"}</div>
+    </div>
+    <div class="text">
+      <div class="name" title="${d.name}">${d.name}</div>
+      <div class="meta">
+        <div class="line"><span class="label">時給</span><span class="value">${fmtYen(d.wage)}</span></div>
+        <div class="line"><span class="label">年齢</span><span class="value">${d.age} 歳</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 初期化 */
+(function init(){
+  document.getElementById('owner').parentElement.style.display="flex";
+  updateOwnerOptionsByRole();
+  render();
+})();
+</script>
+
+<!-- 追加: 現在URLに基づいてサイドバーの active を自動付与 -->
+<script>
+(function () {
+  const links = document.querySelectorAll('.side-list a');
+  if (!links.length) return;
+
+  const here = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+
+  // いったん全て外す
+  links.forEach(a => a.classList.remove('active'));
+
+  // href が現在のファイル名と一致するもの、もしくは index.html の時は dashboard.html を active
+  links.forEach(a => {
+    const href = (a.getAttribute('href') || '').split('?')[0].split('#')[0].toLowerCase();
+    const isDashIndex = (here === 'index.html' && href === 'dashboard.html');
+    if (href === here || isDashIndex) {
+      a.classList.add('active');
+      a.setAttribute('aria-current', 'page');
+    } else {
+      a.removeAttribute('aria-current');
+    }
+  });
+})();
+
+/* ===== Global SOS Notifier（関数群） ===== */
+(() => {
+  const sosBanner    = document.getElementById('sosBanner');
+  const sosBannerMsg = document.getElementById('sosBannerMsg');
+  const sosOpenBtn   = document.getElementById('sosOpenBtn');
+  const sosMuteBtn   = document.getElementById('sosMuteBtn');
+
+  let sosOsc=null, sosCtx=null, sosMuted=false;
+
+  function playSosTone(){
+    try{
+      if(sosMuted) return;
+      sosCtx = sosCtx || new (window.AudioContext||window.webkitAudioContext)();
+      const osc = sosCtx.createOscillator();
+      const gain = sosCtx.createGain();
+      osc.frequency.value=880;         // 警告っぽい音
+      osc.type="square";
+      gain.gain.value=0.05;            // 音量控えめ
+      osc.connect(gain).connect(sosCtx.destination);
+      osc.start();
+      sosOsc = osc;
+    }catch(e){}
+  }
+  function stopSosTone(){
+    try{ if(sosOsc){ sosOsc.stop(); sosOsc.disconnect(); sosOsc=null; } }catch(e){}
+  }
+
+  /** 受信時に呼ぶ：バナー表示＋音 */
+  function showSosBanner(payload){
+    const ownerName = payload.ownerName || payload.owner || '';
+    sosBannerMsg.textContent = `🚨 ${payload.cast || 'キャスト'} さんがSOS発報（担当: ${ownerName}）`;
+    sosBanner.style.display='flex';
+    playSosTone();
+  }
+  function hideSosBanner(){
+    sosBanner.style.display='none';
+    stopSosTone();
+  }
+
+  // ボタン動作（「開く」でSOSページへ、「停止」でミュート）
+  sosOpenBtn?.addEventListener('click', () => {
+    hideSosBanner();
+    try{ window.location.href = 'sos.html'; }catch(e){}
+  });
+  sosMuteBtn?.addEventListener('click', () => {
+    sosMuted = true;
+    hideSosBanner();
+  });
+
+  // 他タブ・他ページからのブロードキャストを受信
+  window.addEventListener('storage', (e)=>{
+    if(e.key === 'sos_broadcast' && e.newValue){
+      try{
+        const data = JSON.parse(e.newValue);
+        showSosBanner(data);
+      }catch(_){}
+    }
+  });
+
+  // ===== 公開API（全ページから使えるように window に露出） =====
+  /** 任意ページで呼ぶ：バナーを直接出す */
+  window.showSosBanner = showSosBanner;
+
+  /** 任意ページで呼ぶ：全タブ・全ページへ通知（localStorage ブロードキャスト） */
+  window.broadcastSOS = function(payload){
+    try{ localStorage.setItem('sos_broadcast', JSON.stringify(payload || {})); }catch(e){}
+    // 同タブでも即時表示
+    showSosBanner(payload || {});
+  };
+})();
+</script>
+</body>
+</html>

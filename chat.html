@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>チャット（LINE） | トーク管理</title>
+<style>
+  :root{
+    --gap:6px; --radius:10px; --bg:#f7f7f8; --panel:#ffffff; --text:#222;
+    --muted:#667085; --line:#e5e7eb; --accent:#2563eb; --accent-2:#0ea5e9;
+    --sidebar:#0f172a; --sidebarText:#e2e8f0;
+    --sidebarW:160px; --wrapW:1160px; --shadow:0 8px 24px rgba(16,24,40,.08);
+    --me:#dbeafe; --you:#f1f5f9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+  /* Sidebar（共通） */
+  .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+  .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 6px;}
+  .side-logo img{width:86%; height:auto; object-fit:contain}
+  .side-group{margin-bottom:8px;}
+  .side-sec{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9;}
+  .side-list{list-style:none;margin:0;padding:4px}
+  .side-list a{display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:8px; cursor:pointer; font-size:12px; color:var(--sidebarText); text-decoration:none}
+  .side-list a:hover{background:rgba(255,255,255,.06)}
+  .side-list a.active{background:rgba(255,255,255,.12)}
+
+  /* Main */
+  .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+  header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+  .wrap{max-width:var(--wrapW); margin:0 auto; padding:6px 10px;}
+  .head-top{display:grid; grid-template-columns: 1fr auto auto; align-items:center; column-gap:12px; row-gap:6px;}
+  .title{font-size:16px; font-weight:700; margin:0;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-self:end;}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+  .role{font-weight:700}
+  .login{display:flex; align-items:center; gap:6px;}
+  .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
+  .logout-btn{background:#fff; color:#111; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer}
+  .logout-btn:hover{background:#f8fafc}
+
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 0 2px 0; font-size:12px}
+  .toolbar input,.toolbar select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .toolbar .spacer{flex:1 1 auto}
+
+  /* Layout */
+  .content{flex:1 1 auto; display:flex;}
+  .panel{flex:1 1 auto; background:#fff; border:1px solid var(--line); border-radius:0; margin:0; width:100%; max-width:none; display:flex;}
+  .threads{flex:0 0 360px; border-right:1px solid var(--line); display:flex; flex-direction:column; min-width:280px;}
+  .chat{flex:1 1 auto; display:flex; flex-direction:column; min-width:0;}
+
+  /* Thread list */
+  .thread-head{padding:10px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .thread-head input,.thread-head select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .thread-list{flex:1 1 auto; overflow:auto;}
+  .item{display:grid; grid-template-columns: 40px 1fr auto; gap:8px; padding:10px; border-bottom:1px solid #f1f5f9; cursor:pointer;}
+  .item:hover{background:#f8fafc}
+  .item.active{background:#eff6ff}
+  .avatar{width:40px; height:40px; border-radius:999px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-weight:800; color:#475569;}
+  .meta{display:flex; align-items:center; gap:6px;}
+  .name{font-weight:800;}
+  .sub{color:#64748b; font-size:12px;}
+  .owner{border-radius:999px; padding:2px 6px; border:1px solid var(--line); font-size:11px; background:#fff;}
+  .unread{background:#ef4444; color:#fff; font-size:11px; border-radius:999px; padding:2px 6px;}
+  .time{color:#64748b; font-size:12px; white-space:nowrap;}
+
+  /* Chat view */
+  .chat-head{padding:10px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+  .chat-title{font-weight:800;}
+  .chat-sub{color:#64748b; font-size:12px;}
+  .messages{flex:1 1 auto; overflow:auto; padding:12px; background:#f8fafc;}
+  .bubble{max-width:70%; padding:8px 10px; border-radius:12px; margin:6px 0; box-shadow:0 1px 0 rgba(0,0,0,.04);}
+  .me{background:var(--me); margin-left:auto; border:1px solid #bfdbfe;}
+  .you{background:var(--you); margin-right:auto; border:1px solid #e2e8f0;}
+  .stamp{font-size:11px; color:#64748b; margin-top:2px; text-align:right;}
+  .composer{display:flex; gap:8px; padding:10px; border-top:1px solid var(--line); background:#fff;}
+  .composer textarea{flex:1 1 auto; min-height:38px; max-height:120px; resize:vertical; border:1px solid var(--line); border-radius:10px; padding:8px;}
+  .composer .btn{border:1px solid var(--line); background:var(--accent); color:#fff; border-radius:10px; padding:8px 12px; font-size:12px; cursor:pointer}
+  .composer.disabled textarea{background:#f8fafc; color:#94a3b8}
+  .composer.disabled .btn{background:#e5e7eb; color:#94a3b8; cursor:not-allowed}
+  .empty{display:flex; align-items:center; justify-content:center; color:#94a3b8; height:100%;}
+/* ===== Global SOS Notifier ===== */
+.sos-banner{
+  position:fixed; inset:0 0 auto 0; height:64px;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(90deg,#7f1d1d,#dc2626,#b91c1c);
+  color:#fff; z-index:999999; box-shadow:0 4px 20px rgba(0,0,0,.35);
+}
+.sos-banner .inner{display:flex; align-items:center; gap:12px; font-weight:900; letter-spacing:.05em;}
+.sos-banner .msg{font-size:16px;}
+/* 既存の .btn が無いページ向けの軽いフォールバック */
+.sos-banner .btn{padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.6); background:rgba(255,255,255,.12); color:#fff; cursor:pointer;}
+.flash{animation:flash 1s infinite alternate ease-in-out;}
+@keyframes flash { from {opacity:1; transform:scale(1);} to {opacity:.6; transform:scale(1.02);} }
+.shake{animation:shake .5s infinite;}
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+
+</style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo"><a href="dashboard.html"><img src="img/logo4.png" alt="LOGO"/></a></div>
+
+    <div class="side-group">
+      <div class="side-sec">運用機能</div>
+      <ul class="side-list">
+        <li><a href="dashboard.html">ダッシュボード</a></li>
+        <li><a href="schedule.html">スケジュール</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">管理機能</div>
+      <ul class="side-list">
+        <li><a href="cast.html">キャスト管理</a></li>
+        <li><a href="shops.html">店舗管理</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">通信機能</div>
+      <ul class="side-list">
+        <li><a class="active" href="chat.html">チャット（LINE）</a></li>
+        <li><a href="sos.html">SOSアラート</a></li>
+      </ul>
+    </div>
+
+    <div class="side-group">
+      <div class="side-sec">設定機能</div>
+      <ul class="side-list">
+        <li><a href="request.html">申請・承認</a></li>
+        <li><a href="setting.html">設定</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ===== Global SOS Notifier（全ページ共通バナー） ===== -->
+  <div id="sosBanner" class="sos-banner flash shake" role="alert" aria-live="assertive">
+    <div class="inner">
+      <span style="font-size:20px;">🚨 SOS</span>
+      <span class="msg" id="sosBannerMsg">キャストからSOSを受信！至急確認してください！</span>
+      <button class="btn" id="sosOpenBtn">開く</button>
+      <button class="btn" id="sosMuteBtn">停止</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="head-top">
+          <h1 class="title">チャット（LINE）</h1>
+          <div></div>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span> <span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="logout-btn" onclick="location.href='index.html'">ログアウト</button>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <input id="q" type="text" placeholder="名前・LINE IDで検索" style="min-width:240px">
+          <select id="ownerFilter" style="display:none">
+            <option value="">担当者（すべて）</option>
+            <option value="tanaka">田中</option>
+            <option value="sato">佐藤</option>
+            <option value="suzuki">鈴木</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="sub" id="viewHint"></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="panel">
+        <!-- Left: thread list -->
+        <aside class="threads">
+          <div class="thread-head">
+            <input id="thQuery" type="text" placeholder="スレッド検索（名前・ID）" style="flex:1 1 auto;">
+            <select id="thOwner" style="min-width:140px;">
+              <option value="">担当者（すべて）</option>
+              <option value="tanaka">田中</option>
+              <option value="sato">佐藤</option>
+              <option value="suzuki">鈴木</option>
+            </select>
+          </div>
+          <div id="threadList" class="thread-list"></div>
+        </aside>
+
+        <!-- Right: chat view -->
+        <section class="chat">
+          <div class="chat-head">
+            <div>
+              <div class="chat-title" id="chatTitle">スレッド未選択</div>
+              <div class="chat-sub" id="chatSub">左の一覧から選択してください</div>
+            </div>
+            <button class="btn" id="readBtn" style="display:none; border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer">既読にする</button>
+          </div>
+          <div id="msgArea" class="messages">
+            <div class="empty">スレッドを選択するとメッセージが表示されます</div>
+          </div>
+          <div id="composer" class="composer disabled" title="担当者ログイン時のみ送信できます">
+            <textarea id="msgInput" placeholder="メッセージを入力..." disabled></textarea>
+            <button class="btn" id="sendBtn" disabled>送信</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ===== デモ用データ ===== */
+const STAFFS = {
+  tanaka:{id:'tanaka', name:'田中'},
+  sato:{id:'sato', name:'佐藤'},
+  suzuki:{id:'suzuki', name:'鈴木'}
+};
+function rand(arr){return arr[Math.floor(Math.random()*arr.length)]}
+function fmtHM(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function fmtDateTime(d){return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${fmtHM(d)}`}
+function initials(s){return s.slice(0,2)}
+
+const NAMES = ["山田花子","佐々木真央","高橋さくら","工藤りな","田村うた","桜井ゆめ","相沢ここ","白石れい","一ノ瀬まこ","二階堂みお",
+"伊藤めい","篠原みさき","西野もも","志村ほのか","松尾なつ","中村しずく","綾瀬あや","早川みく","神崎しおり","相原りお"];
+const owners = ["tanaka","sato","suzuki"];
+
+const THREADS = Array.from({length:36}, (_,i)=>{
+  const name = NAMES[i%NAMES.length];
+  const owner = owners[i%owners.length];
+  const lineId = "U" + (100000+i);
+  const now = new Date(); now.setMinutes(now.getMinutes()-i*7);
+  const unread = (i%5===0)?Math.floor(Math.random()*4)+1:0;
+  return {id:"t"+(i+1), name, lineId, owner, last: "よろしくお願いします！", lastAt: now, unread};
+});
+
+// メッセージ（軽く生成）
+const MSGDB = {};
+THREADS.forEach(t=>{
+  const arr=[];
+  for(let i=0;i<rand([6,8,10,12]);i++){
+    const from = (i%2===0)?'client':'staff';
+    const text = from==='client' ? rand(["明日空いてますか？","詳細を教えてください","ありがとうございます！","いつ頃になりますか？","また連絡します。"]) :
+                                   rand(["承知しました。","確認いたします。","よろしくお願いします。","ありがとうございます！","はい、問題ありません。"]);
+    const ts = new Date(t.lastAt); ts.setMinutes(ts.getMinutes() - (rand([2,3,4,5])*i));
+    arr.push({from, text, ts});
+  }
+  MSGDB[t.id]=arr;
+});
+
+/* ===== 状態 ===== */
+let state={
+  login:{role:"ADMIN", user:"admin"}, // or STAFF:tanaka/sato/suzuki
+  filter:{q:"", owner:""},
+  activeThreadId:null
+};
+
+/* ===== ログインUI ===== */
+const loginSelect = document.getElementById('loginSelect');
+const roleBadge = document.getElementById('roleBadge');
+const ownerFilter = document.getElementById('ownerFilter');
+const viewHint = document.getElementById('viewHint');
+
+loginSelect.addEventListener('change', ()=>{
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+  roleBadge.textContent=(role==="ADMIN"?"管理者":"担当者");
+  // 管理者は全件・担当者は自分のスレッドのみ表示
+  document.getElementById('thOwner').style.display = (role==="ADMIN") ? "inline-block" : "none";
+  state.filter.owner = (role==="ADMIN") ? document.getElementById('thOwner').value : user;
+  // 送信権限の切替
+  applyComposerPermission();
+  renderThreads();
+  // アクセスヒント
+  if(role==="ADMIN"){
+    viewHint.textContent = "管理者：全担当者のトークを閲覧できます（送信は無効）";
+  }else{
+    viewHint.textContent = `担当者：${STAFFS[user].name} のトークのみ閲覧・送信できます`;
+  }
+});
+
+/* ===== スレッド一覧 ===== */
+const thQuery = document.getElementById('thQuery');
+const thOwner = document.getElementById('thOwner');
+thQuery.addEventListener('input', ()=>{ state.filter.q = thQuery.value.trim(); renderThreads(); });
+thOwner.addEventListener('change', ()=>{ state.filter.owner = thOwner.value; renderThreads(); });
+
+function filteredThreads(){
+  let arr = THREADS.slice();
+  // 権限制御
+  if(state.login.role==="STAFF"){ arr = arr.filter(t=>t.owner===state.login.user); }
+  // 管理者のオーナーフィルタ
+  if(state.login.role==="ADMIN" && state.filter.owner){ arr = arr.filter(t=>t.owner===state.filter.owner); }
+  // 検索
+  const q=(state.filter.q||"").toLowerCase().normalize("NFKC");
+  if(q){
+    arr = arr.filter(t=>{
+      const key=(t.name+" "+t.lineId).toLowerCase().normalize("NFKC");
+      return key.includes(q);
+    });
+  }
+  // 並び：未読降順→最終時刻降順
+  arr.sort((a,b)=>{
+    if((b.unread||0)!==(a.unread||0)) return (b.unread||0)-(a.unread||0);
+    return b.lastAt - a.lastAt;
+  });
+  return arr;
+}
+
+function renderThreads(){
+  const list = filteredThreads();
+  const el=document.getElementById('threadList');
+  if(list.length===0){ el.innerHTML='<div class="empty" style="padding:24px;">該当スレッドはありません</div>'; return; }
+  el.innerHTML = list.map(t=>`
+    <div class="item ${state.activeThreadId===t.id?'active':''}" data-id="${t.id}">
+      <div class="avatar">${initials(t.name)}</div>
+      <div>
+        <div class="meta">
+          <span class="name">${t.name}</span>
+          <span class="owner">${STAFFS[t.owner].name}</span>
+          ${t.unread?`<span class="unread">${t.unread}</span>`:''}
+        </div>
+        <div class="sub">ID: ${t.lineId} / ${t.last}</div>
+      </div>
+      <div class="time">${fmtHM(t.lastAt)}</div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('threadList').addEventListener('click', (e)=>{
+  const item = e.target.closest('.item'); if(!item) return;
+  const id=item.getAttribute('data-id');
+  openThread(id);
+});
+
+function openThread(id){
+  state.activeThreadId=id;
+  const t=THREADS.find(x=>x.id===id); if(!t) return;
+  // 既読ボタン可視化
+  document.getElementById('readBtn').style.display = t.unread? 'inline-block':'none';
+  // ヘッダー
+  document.getElementById('chatTitle').textContent = t.name;
+  document.getElementById('chatSub').textContent = `LINE ID: ${t.lineId} / 担当: ${STAFFS[t.owner].name}`;
+  // メッセージ
+  renderMessages(id);
+  // 権限に応じて送信可否
+  applyComposerPermission();
+  // リスト再描画（選択ハイライト/未読表示のため）
+  renderThreads();
+}
+
+/* ===== メッセージ描画・送信 ===== */
+function renderMessages(id){
+  const box=document.getElementById('msgArea');
+  const msgs=MSGDB[id]||[];
+  if(msgs.length===0){ box.innerHTML='<div class="empty">メッセージはまだありません</div>'; return; }
+  box.innerHTML = msgs.map(m=>`
+    <div class="bubble ${m.from==='staff'?'me':'you'}">
+      <div>${escapeHtml(m.text)}</div>
+      <div class="stamp">${fmtDateTime(m.ts)}</div>
+    </div>
+  `).join('');
+  box.scrollTop = box.scrollHeight;
+}
+function applyComposerPermission(){
+  const comp = document.getElementById('composer');
+  const input = document.getElementById('msgInput');
+  const btn = document.getElementById('sendBtn');
+  const th = THREADS.find(x=>x.id===state.activeThreadId);
+  const canSend = (state.login.role==="STAFF") && th && (th.owner===state.login.user);
+  if(canSend){
+    comp.classList.remove('disabled');
+    input.disabled=false; btn.disabled=false; comp.removeAttribute('title');
+  }else{
+    comp.classList.add('disabled');
+    input.disabled=true; btn.disabled=true;
+    comp.title = (state.login.role==="ADMIN") ? "管理者は閲覧専用です" : "担当外のスレッドは送信できません";
+  }
+}
+document.getElementById('sendBtn').addEventListener('click', sendMessage);
+document.getElementById('msgInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+function sendMessage(){
+  const th = THREADS.find(x=>x.id===state.activeThreadId);
+  if(!th) return;
+  const text = document.getElementById('msgInput').value.trim();
+  if(!text) return;
+  // 権限チェック
+  if(!(state.login.role==="STAFF" && th.owner===state.login.user)) return;
+
+  const now=new Date();
+  MSGDB[th.id]=MSGDB[th.id]||[];
+  MSGDB[th.id].push({from:'staff', text, ts:now});
+  th.last = text; th.lastAt = now;
+
+  // 自分が送信→未読は相手側なので list 未読は変えない想定。ここでは 0 のままに。
+  document.getElementById('msgInput').value="";
+  renderMessages(th.id);
+  renderThreads();
+}
+
+/* ===== 既読処理 ===== */
+document.getElementById('readBtn').addEventListener('click', ()=>{
+  const th = THREADS.find(x=>x.id===state.activeThreadId); if(!th) return;
+  th.unread = 0;
+  document.getElementById('readBtn').style.display='none';
+  renderThreads();
+});
+
+/* ===== 小ユーティリティ ===== */
+function escapeHtml(s){return s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]))}
+
+/* ===== 初期化 ===== */
+(function init(){
+  // ログイン表示
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+  roleBadge.textContent=(role==="ADMIN"?"管理者":"担当者");
+  // 担当者ビューの場合は一覧の担当者フィルタを隠し、自分のみに固定
+  document.getElementById('thOwner').style.display = (role==="ADMIN") ? "inline-block" : "none";
+  state.filter.owner = (role==="ADMIN") ? "" : user;
+  // 検索初期
+  thQuery.value=""; state.filter.q="";
+  renderThreads();
+  viewHint.textContent = "管理者：全担当者のトークを閲覧できます（送信は無効）";
+})();
+
+/* ===== Global SOS Notifier（関数群） ===== */
+(() => {
+  const sosBanner    = document.getElementById('sosBanner');
+  const sosBannerMsg = document.getElementById('sosBannerMsg');
+  const sosOpenBtn   = document.getElementById('sosOpenBtn');
+  const sosMuteBtn   = document.getElementById('sosMuteBtn');
+
+  let sosOsc=null, sosCtx=null, sosMuted=false;
+
+  function playSosTone(){
+    try{
+      if(sosMuted) return;
+      sosCtx = sosCtx || new (window.AudioContext||window.webkitAudioContext)();
+      const osc = sosCtx.createOscillator();
+      const gain = sosCtx.createGain();
+      osc.frequency.value=880;         // 警告っぽい音
+      osc.type="square";
+      gain.gain.value=0.05;            // 音量控えめ
+      osc.connect(gain).connect(sosCtx.destination);
+      osc.start();
+      sosOsc = osc;
+    }catch(e){}
+  }
+  function stopSosTone(){
+    try{ if(sosOsc){ sosOsc.stop(); sosOsc.disconnect(); sosOsc=null; } }catch(e){}
+  }
+
+  /** 受信時に呼ぶ：バナー表示＋音 */
+  function showSosBanner(payload){
+    const ownerName = payload.ownerName || payload.owner || '';
+    sosBannerMsg.textContent = `🚨 ${payload.cast || 'キャスト'} さんがSOS発報（担当: ${ownerName}）`;
+    sosBanner.style.display='flex';
+    playSosTone();
+  }
+  function hideSosBanner(){
+    sosBanner.style.display='none';
+    stopSosTone();
+  }
+
+  // ボタン動作（「開く」でSOSページへ、「停止」でミュート）
+  sosOpenBtn?.addEventListener('click', () => {
+    hideSosBanner();
+    try{ window.location.href = 'sos.html'; }catch(e){}
+  });
+  sosMuteBtn?.addEventListener('click', () => {
+    sosMuted = true;
+    hideSosBanner();
+  });
+
+  // 他タブ・他ページからのブロードキャストを受信
+  window.addEventListener('storage', (e)=>{
+    if(e.key === 'sos_broadcast' && e.newValue){
+      try{
+        const data = JSON.parse(e.newValue);
+        showSosBanner(data);
+      }catch(_){}
+    }
+  });
+
+  // ===== 公開API（全ページから使えるように window に露出） =====
+  /** 任意ページで呼ぶ：バナーを直接出す */
+  window.showSosBanner = showSosBanner;
+
+  /** 任意ページで呼ぶ：全タブ・全ページへ通知（localStorage ブロードキャスト） */
+  window.broadcastSOS = function(payload){
+    try{ localStorage.setItem('sos_broadcast', JSON.stringify(payload || {})); }catch(e){}
+    // 同タブでも即時表示
+    showSosBanner(payload || {});
+  };
+})();
+</script>
+</body>
+</html>
