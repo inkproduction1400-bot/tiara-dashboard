@@ -284,7 +284,16 @@
 const STAFFS = { tanaka:{id:'tanaka',name:'田中'}, sato:{id:'sato',name:'佐藤'}, suzuki:{id:'suzuki',name:'鈴木'} };
 const CAST_NAMES  = ["あい","さくら","みゆ","えりか","りお","ひかり","ゆい","なな","ここ","れい","しおり","りか","みお","ゆか","なつ","しずく","みく","あや","ゆう","まこ"];
 function pad2(n){return String(n).padStart(2,'0')}
-function fmtDT(d){return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`}
+function fmtDT(d){
+  const dt = (d instanceof Date) ? d : new Date(d);
+  const y = dt.getFullYear();
+  const m = pad2(dt.getMonth()+1);
+  const da = pad2(dt.getDate());
+  const h = pad2(dt.getHours());
+  const mi = pad2(dt.getMinutes());
+  const s = pad2(dt.getSeconds());
+  return `${y}/${m}/${da} ${h}:${mi}:${s}`;
+}
 function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min}
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)]}
 
@@ -297,7 +306,7 @@ for(const name of CAST_NAMES){
   const owner = pick(Object.keys(STAFFS));
   const tags = pick([["飲酒OK","送迎あり"],["飲酒NG","送迎なし"],["飲酒OK","送迎なし"],["飲酒NG","送迎あり"]]);
   const memo = pick(["","","",""]);
-  const img = null; // 画像パスがあれば指定（例: `img/cast1.jpg`）
+  const img = null;
   CAST_MASTER[name] = {name, age, phone, line, owner, tags, memo, img};
 }
 
@@ -306,7 +315,7 @@ let state = {
   login:{role:"ADMIN", user:"admin"},
   filter:{q:"", owner:"", status:""},
   activeId:null,
-  list:[] // {id, cast, owner, text, lat, lng, at, status}
+  list:[]
 };
 
 /* ===== ログイン切替 ===== */
@@ -336,14 +345,17 @@ function filtered(){
 }
 function renderList(){
   const list = filtered();
-  document.getElementById('totalCnt').textContent = list.length;
-  document.getElementById('openCnt').textContent = list.filter(x=>x.status==='OPEN').length;
-  document.getElementById('handlingCnt').textContent = list.filter(x=>x.status==='HANDLING').length;
-  document.getElementById('closedCnt').textContent = list.filter(x=>x.status==='CLOSED').length;
+  totalCnt.textContent = list.length;
+  openCnt.textContent = list.filter(x=>x.status==='OPEN').length;
+  handlingCnt.textContent = list.filter(x=>x.status==='HANDLING').length;
+  closedCnt.textContent = list.filter(x=>x.status==='CLOSED').length;
 
-  const el = document.getElementById('sosList');
-  if(list.length===0){ el.innerHTML='<div style="padding:18px; color:#94a3b8;">該当アラートはありません</div>'; clearDetail(); return; }
-  el.innerHTML = list.map(x=>`
+  if(list.length===0){
+    sosList.innerHTML='<div style="padding:18px; color:#94a3b8;">該当アラートはありません</div>';
+    clearDetail();
+    return;
+  }
+  sosList.innerHTML = list.map(x=>`
     <div class="srow ${state.activeId===x.id?'active':''}" data-id="${x.id}">
       <div class="icon">SOS</div>
       <div>
@@ -363,8 +375,8 @@ sosList.addEventListener('click', (e)=>{
 function openDetail(id){
   state.activeId=id;
   const x=state.list.find(a=>a.id===id); if(!x) return;
-  document.getElementById('detailName').innerHTML = `<button class="link" onclick="openCastModal('${x.cast}')">${x.cast} さん</button>のSOS`;
-  document.getElementById('detailMeta').textContent = `${fmtDT(x.at)} / ステータス: ${x.status}`;
+  detailName.innerHTML = `<button class="link" onclick="openCastModal('${x.cast}')">${x.cast} さん</button>のSOS`;
+  detailMeta.textContent = `${fmtDT(x.at)} / ステータス: ${x.status}`;
   dCast.innerHTML = `<button class="link" onclick="openCastModal('${x.cast}')">${x.cast}</button>`;
   dOwner.textContent = STAFFS[x.owner].name;
   dTime.textContent = fmtDT(x.at);
@@ -379,7 +391,12 @@ function clearDetail(){
   state.activeId=null;
   detailName.textContent="未選択";
   detailMeta.textContent="左の一覧から選択してください";
-  dCast.textContent=dOwner.textContent=dTime.textContent=dStatus.textContent=dText.textContent=dLatLng.textContent="";
+  dCast.textContent="";
+  dOwner.textContent="";
+  dTime.textContent="";
+  dStatus.textContent="";
+  dText.textContent="";
+  dLatLng.textContent="";
   btnMap.href="#";
 }
 function applyDetailPermission(){
@@ -397,26 +414,48 @@ btnClose.addEventListener('click', ()=>{
   x.status='CLOSED'; openDetail(x.id);
 });
 
-/* ====== 追加：キャスト詳細モーダル ====== */
+/* ====== 追加：キャスト名正規化＆フォールバック ====== */
+function normName(s){ return (s||"").trim().toLowerCase().normalize("NFKC"); }
+function ensureCastProfile(name){
+  const n = normName(name);
+  for (const k of Object.keys(CAST_MASTER)){
+    if (normName(k) === n) return CAST_MASTER[k];
+  }
+  const owner = pick(Object.keys(STAFFS));
+  const demo = {
+    name: name || '不明',
+    age: rand(18,32),
+    phone: `080-${rand(1000,9999)}-${rand(1000,9999)}`,
+    line: (name||'cast') + '_line',
+    owner,
+    tags: pick([["飲酒OK","送迎あり"],["飲酒NG","送迎なし"],["飲酒OK","送迎なし"],["飲酒NG","送迎あり"]]),
+    memo: '',
+    img: null
+  };
+  CAST_MASTER[name || `cast_${Date.now()}`] = demo;
+  return demo;
+}
+
+/* ====== 差し替え：キャスト詳細モーダル ====== */
 function openCastModal(castName){
-  const m = CAST_MASTER[castName];
-  document.getElementById('castTitle').textContent = m ? `${m.name} さんの詳細` : 'キャスト詳細';
-  const avatar = document.getElementById('castAvatar');
-  if (m?.img){
+  const m = ensureCastProfile(castName);
+  castTitle.textContent = `${m.name} さんの詳細`;
+  const avatar = castAvatar;
+  if (m.img){
     avatar.innerHTML = `<img src="${m.img}" alt="${m.name}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
   }else{
     avatar.textContent = 'No Image';
   }
-  document.getElementById('cName').textContent  = m?.name  || castName || '-';
-  document.getElementById('cAge').textContent   = m?.age   ? `${m.age} 歳` : '-';
-  document.getElementById('cPhone').textContent = m?.phone || '-';
-  document.getElementById('cLine').textContent  = m?.line  || '-';
-  document.getElementById('cOwner').textContent = m?.owner ? (STAFFS[m.owner]?.name || m.owner) : '-';
-  document.getElementById('cTags').textContent  = m?.tags?.join(' / ') || '-';
-  document.getElementById('cMemo').textContent  = m?.memo  || '';
-  document.getElementById('castModal').style.display = 'flex';
+  cName.textContent  = m.name || '-';
+  cAge.textContent   = m.age ? `${m.age} 歳` : '-';
+  cPhone.textContent = m.phone || '-';
+  cLine.textContent  = m.line || '-';
+  cOwner.textContent = m.owner ? (STAFFS[m.owner]?.name || m.owner) : '-';
+  cTags.textContent  = m.tags?.join(' / ') || '-';
+  cMemo.textContent  = m.memo || '';
+  castModal.style.display = 'flex';
 }
-function closeCastModal(){ document.getElementById('castModal').style.display = 'none'; }
+function closeCastModal(){ castModal.style.display = 'none'; }
 
 /* ===== Global SOS Notifier（全ページ共通） ===== */
 (() => {
@@ -425,10 +464,9 @@ function closeCastModal(){ document.getElementById('castModal').style.display = 
   const sosOpenBtn   = document.getElementById('sosOpenBtn');
   const sosMuteBtn   = document.getElementById('sosMuteBtn');
 
-  // 永続ミュート・制御・ブロードキャスト用キー
   const MUTE_KEY = 'sos_muted_v1';
-  const CTRL_KEY = 'sos_ctrl_v1';       // {t, cmd:'mute'|'unmute'}
-  const CAST_KEY = 'sos_broadcast';     // SOS内容ブロードキャスト
+  const CTRL_KEY = 'sos_ctrl_v1';
+  const CAST_KEY = 'sos_broadcast';
 
   let sosOsc=null, sosCtx=null;
   const isMuted = () => localStorage.getItem(MUTE_KEY) === '1';
@@ -480,7 +518,6 @@ function closeCastModal(){ document.getElementById('castModal').style.display = 
   });
   sosMuteBtn?.addEventListener('click', muteSOS);
 
-  // バナー表示制御の同期
   window.addEventListener('storage', (e)=>{
     if (e.key === CAST_KEY && e.newValue){
       if (isMuted()) return;
@@ -494,7 +531,6 @@ function closeCastModal(){ document.getElementById('castModal').style.display = 
     }
   });
 
-  // 公開API
   window.broadcastSOS = function(payload){
     localStorage.setItem(CAST_KEY, JSON.stringify(payload || {}));
     if (!isMuted()) showSosBanner(payload || {});
@@ -506,13 +542,16 @@ function closeCastModal(){ document.getElementById('castModal').style.display = 
   if (isMuted()) hideSosBanner();
 })();
 
-/* ===== 追加：SOSを一覧へ取り込む & テスト発報 ===== */
+/* ===== 受信取り込み & テスト発報 ===== */
 
 // 受信SOSを内部リストへ取り込み（重複防止）
 function addSosToList(payload){
   if (!payload) return;
-  const id = 'sos-' + (payload.at || Date.now());
-  if (state.list.some(x => x.id === id)) return; // 既に存在
+  ensureCastProfile(payload.cast);
+
+  const atTs = Number(payload.at) || Date.now();   // ← 正規化
+  const id = 'sos-' + atTs;
+  if (state.list.some(x => x.id === id)) return;
 
   state.list.push({
     id,
@@ -521,12 +560,12 @@ function addSosToList(payload){
     text: payload.text || '',
     lat: Number(payload.lat) || 0,
     lng: Number(payload.lng) || 0,
-    at: Number(payload.at) || Date.now(),
+    at: atTs,                                     // ← 数値で保持
     status: 'OPEN'
   });
 
   renderList();
-  openDetail(id); // 自動で開く（不要なら削除OK）
+  openDetail(id);
 }
 
 // 他タブからの SOS ブロードキャストで一覧も更新（※ミュートでも反映）
@@ -540,8 +579,8 @@ window.addEventListener('storage', (e)=>{
 });
 
 // テストSOS発報（ミュート解除→配信→同タブ反映）
-document.getElementById('testSOS')?.addEventListener('click', ()=>{
-  if (typeof unmuteSOS === 'function') unmuteSOS(); // テストは鳴るように
+testSOS?.addEventListener('click', ()=>{
+  if (typeof unmuteSOS === 'function') unmuteSOS();
   const who     = pick(Object.keys(CAST_MASTER));
   const ownerId = pick(Object.keys(STAFFS));
   const payload = {
@@ -549,14 +588,12 @@ document.getElementById('testSOS')?.addEventListener('click', ()=>{
     owner: ownerId,
     ownerName: STAFFS[ownerId].name,
     text: '【テスト】至急対応をお願いします。',
-    lat: 35.681236, lng: 139.767125, // 東京駅
+    lat: 35.681236, lng: 139.767125,
     at: Date.now()
   };
-  if (typeof broadcastSOS === 'function') broadcastSOS(payload); // 全タブへ
-  addSosToList(payload); // 同タブ即時
+  if (typeof broadcastSOS === 'function') broadcastSOS(payload);
+  addSosToList(payload);
 });
-
-/* ===== 初期（必要なら既存レコードを用意してもOK） ===== */
 </script>
 </body>
 </html>
