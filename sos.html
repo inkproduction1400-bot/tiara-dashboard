@@ -397,6 +397,27 @@ btnClose.addEventListener('click', ()=>{
   x.status='CLOSED'; openDetail(x.id);
 });
 
+/* ====== 追加：キャスト詳細モーダル ====== */
+function openCastModal(castName){
+  const m = CAST_MASTER[castName];
+  document.getElementById('castTitle').textContent = m ? `${m.name} さんの詳細` : 'キャスト詳細';
+  const avatar = document.getElementById('castAvatar');
+  if (m?.img){
+    avatar.innerHTML = `<img src="${m.img}" alt="${m.name}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+  }else{
+    avatar.textContent = 'No Image';
+  }
+  document.getElementById('cName').textContent  = m?.name  || castName || '-';
+  document.getElementById('cAge').textContent   = m?.age   ? `${m.age} 歳` : '-';
+  document.getElementById('cPhone').textContent = m?.phone || '-';
+  document.getElementById('cLine').textContent  = m?.line  || '-';
+  document.getElementById('cOwner').textContent = m?.owner ? (STAFFS[m.owner]?.name || m.owner) : '-';
+  document.getElementById('cTags').textContent  = m?.tags?.join(' / ') || '-';
+  document.getElementById('cMemo').textContent  = m?.memo  || '';
+  document.getElementById('castModal').style.display = 'flex';
+}
+function closeCastModal(){ document.getElementById('castModal').style.display = 'none'; }
+
 /* ===== Global SOS Notifier（全ページ共通） ===== */
 (() => {
   const sosBanner    = document.getElementById('sosBanner');
@@ -404,17 +425,16 @@ btnClose.addEventListener('click', ()=>{
   const sosOpenBtn   = document.getElementById('sosOpenBtn');
   const sosMuteBtn   = document.getElementById('sosMuteBtn');
 
-  // --- 追加: ミュートの恒久化キー＆制御キー
+  // 永続ミュート・制御・ブロードキャスト用キー
   const MUTE_KEY = 'sos_muted_v1';
   const CTRL_KEY = 'sos_ctrl_v1';       // {t, cmd:'mute'|'unmute'}
-  const CAST_KEY = 'sos_broadcast';     // 既存: SOS内容のブロードキャスト
+  const CAST_KEY = 'sos_broadcast';     // SOS内容ブロードキャスト
 
   let sosOsc=null, sosCtx=null;
-
   const isMuted = () => localStorage.getItem(MUTE_KEY) === '1';
 
   function playSosTone(){
-    if (isMuted()) return; // ミュート時は鳴らさない
+    if (isMuted()) return;
     try{
       sosCtx = sosCtx || new (window.AudioContext||window.webkitAudioContext)();
       const osc = sosCtx.createOscillator();
@@ -432,7 +452,7 @@ btnClose.addEventListener('click', ()=>{
   }
 
   function showSosBanner(payload){
-    if (isMuted()) return; // ミュート中は出さない
+    if (isMuted()) return;
     const ownerName = payload?.ownerName || payload?.owner || '';
     const castName  = payload?.cast || 'キャスト';
     sosBannerMsg.textContent = `🚨 ${castName} さんがSOS発報（担当: ${ownerName}）`;
@@ -444,11 +464,9 @@ btnClose.addEventListener('click', ()=>{
     stopSosTone();
   }
 
-  // ---- ミュート／アンミュート（全ページ即時同期）
   function muteSOS(){
-    localStorage.setItem(MUTE_KEY, '1');   // 永続ミュート
+    localStorage.setItem(MUTE_KEY, '1');
     hideSosBanner();
-    // 他タブ・他ページへ制御ブロードキャスト
     localStorage.setItem(CTRL_KEY, JSON.stringify({ t: Date.now(), cmd:'mute' }));
   }
   function unmuteSOS(){
@@ -456,45 +474,89 @@ btnClose.addEventListener('click', ()=>{
     localStorage.setItem(CTRL_KEY, JSON.stringify({ t: Date.now(), cmd:'unmute' }));
   }
 
-  // ボタン
   sosOpenBtn?.addEventListener('click', () => {
     hideSosBanner();
     try{ window.location.href = 'sos.html'; }catch(e){}
   });
   sosMuteBtn?.addEventListener('click', muteSOS);
 
-  // 他タブからの通知＆制御を受信
+  // バナー表示制御の同期
   window.addEventListener('storage', (e)=>{
     if (e.key === CAST_KEY && e.newValue){
-      // SOS受信（ただしミュート中は無視）
       if (isMuted()) return;
       try{ showSosBanner(JSON.parse(e.newValue)); }catch(_) {}
     }
     if (e.key === CTRL_KEY && e.newValue){
-      // ミュート制御同期
       try{
         const msg = JSON.parse(e.newValue);
         if (msg.cmd === 'mute'){ hideSosBanner(); }
-        // 'unmute' はバナーを即表示しない（次の SOS を待つ想定）
       }catch(_){}
     }
   });
 
   // 公開API
-  /** 全タブへSOS配信（同タブも即時表示） */
   window.broadcastSOS = function(payload){
     localStorage.setItem(CAST_KEY, JSON.stringify(payload || {}));
     if (!isMuted()) showSosBanner(payload || {});
   };
-  /** 明示的に表示（ミュート中は出ない） */
   window.showSosBanner = showSosBanner;
-  /** ミュート/解除API（任意ページで利用可） */
   window.muteSOS = muteSOS;
   window.unmuteSOS = unmuteSOS;
 
-  // 初期状態：ミュートなら確実に非表示化
   if (isMuted()) hideSosBanner();
 })();
+
+/* ===== 追加：SOSを一覧へ取り込む & テスト発報 ===== */
+
+// 受信SOSを内部リストへ取り込み（重複防止）
+function addSosToList(payload){
+  if (!payload) return;
+  const id = 'sos-' + (payload.at || Date.now());
+  if (state.list.some(x => x.id === id)) return; // 既に存在
+
+  state.list.push({
+    id,
+    cast: payload.cast || '不明',
+    owner: payload.owner || 'tanaka',
+    text: payload.text || '',
+    lat: Number(payload.lat) || 0,
+    lng: Number(payload.lng) || 0,
+    at: Number(payload.at) || Date.now(),
+    status: 'OPEN'
+  });
+
+  renderList();
+  openDetail(id); // 自動で開く（不要なら削除OK）
+}
+
+// 他タブからの SOS ブロードキャストで一覧も更新（※ミュートでも反映）
+window.addEventListener('storage', (e)=>{
+  if (e.key === 'sos_broadcast' && e.newValue){
+    try{
+      const payload = JSON.parse(e.newValue);
+      addSosToList(payload);
+    }catch(_){}
+  }
+});
+
+// テストSOS発報（ミュート解除→配信→同タブ反映）
+document.getElementById('testSOS')?.addEventListener('click', ()=>{
+  if (typeof unmuteSOS === 'function') unmuteSOS(); // テストは鳴るように
+  const who     = pick(Object.keys(CAST_MASTER));
+  const ownerId = pick(Object.keys(STAFFS));
+  const payload = {
+    cast: who,
+    owner: ownerId,
+    ownerName: STAFFS[ownerId].name,
+    text: '【テスト】至急対応をお願いします。',
+    lat: 35.681236, lng: 139.767125, // 東京駅
+    at: Date.now()
+  };
+  if (typeof broadcastSOS === 'function') broadcastSOS(payload); // 全タブへ
+  addSosToList(payload); // 同タブ即時
+});
+
+/* ===== 初期（必要なら既存レコードを用意してもOK） ===== */
 </script>
 </body>
 </html>
