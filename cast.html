@@ -759,24 +759,31 @@ function pmDrop(e,i){
   });
 })();
 
-/* ===== Global SOS Notifier（関数群） ===== */
+/* ===== Global SOS Notifier（全ページ共通） ===== */
 (() => {
   const sosBanner    = document.getElementById('sosBanner');
   const sosBannerMsg = document.getElementById('sosBannerMsg');
   const sosOpenBtn   = document.getElementById('sosOpenBtn');
   const sosMuteBtn   = document.getElementById('sosMuteBtn');
 
-  let sosOsc=null, sosCtx=null, sosMuted=false;
+  // --- 追加: ミュートの恒久化キー＆制御キー
+  const MUTE_KEY = 'sos_muted_v1';
+  const CTRL_KEY = 'sos_ctrl_v1';       // {t, cmd:'mute'|'unmute'}
+  const CAST_KEY = 'sos_broadcast';     // 既存: SOS内容のブロードキャスト
+
+  let sosOsc=null, sosCtx=null;
+
+  const isMuted = () => localStorage.getItem(MUTE_KEY) === '1';
 
   function playSosTone(){
+    if (isMuted()) return; // ミュート時は鳴らさない
     try{
-      if(sosMuted) return;
       sosCtx = sosCtx || new (window.AudioContext||window.webkitAudioContext)();
       const osc = sosCtx.createOscillator();
       const gain = sosCtx.createGain();
-      osc.frequency.value=880;         // 警告っぽい音
-      osc.type="square";
-      gain.gain.value=0.05;            // 音量控えめ
+      osc.frequency.value = 880;
+      osc.type = "square";
+      gain.gain.value = 0.05;
       osc.connect(gain).connect(sosCtx.destination);
       osc.start();
       sosOsc = osc;
@@ -786,10 +793,11 @@ function pmDrop(e,i){
     try{ if(sosOsc){ sosOsc.stop(); sosOsc.disconnect(); sosOsc=null; } }catch(e){}
   }
 
-  /** 受信時に呼ぶ：バナー表示＋音 */
   function showSosBanner(payload){
-    const ownerName = payload.ownerName || payload.owner || '';
-    sosBannerMsg.textContent = `🚨 ${payload.cast || 'キャスト'} さんがSOS発報（担当: ${ownerName}）`;
+    if (isMuted()) return; // ミュート中は出さない
+    const ownerName = payload?.ownerName || payload?.owner || '';
+    const castName  = payload?.cast || 'キャスト';
+    sosBannerMsg.textContent = `🚨 ${castName} さんがSOS発報（担当: ${ownerName}）`;
     sosBanner.style.display='flex';
     playSosTone();
   }
@@ -798,36 +806,56 @@ function pmDrop(e,i){
     stopSosTone();
   }
 
-  // ボタン動作（「開く」でSOSページへ、「停止」でミュート）
+  // ---- ミュート／アンミュート（全ページ即時同期）
+  function muteSOS(){
+    localStorage.setItem(MUTE_KEY, '1');   // 永続ミュート
+    hideSosBanner();
+    // 他タブ・他ページへ制御ブロードキャスト
+    localStorage.setItem(CTRL_KEY, JSON.stringify({ t: Date.now(), cmd:'mute' }));
+  }
+  function unmuteSOS(){
+    localStorage.removeItem(MUTE_KEY);
+    localStorage.setItem(CTRL_KEY, JSON.stringify({ t: Date.now(), cmd:'unmute' }));
+  }
+
+  // ボタン
   sosOpenBtn?.addEventListener('click', () => {
     hideSosBanner();
     try{ window.location.href = 'sos.html'; }catch(e){}
   });
-  sosMuteBtn?.addEventListener('click', () => {
-    sosMuted = true;
-    hideSosBanner();
-  });
+  sosMuteBtn?.addEventListener('click', muteSOS);
 
-  // 他タブ・他ページからのブロードキャストを受信
+  // 他タブからの通知＆制御を受信
   window.addEventListener('storage', (e)=>{
-    if(e.key === 'sos_broadcast' && e.newValue){
+    if (e.key === CAST_KEY && e.newValue){
+      // SOS受信（ただしミュート中は無視）
+      if (isMuted()) return;
+      try{ showSosBanner(JSON.parse(e.newValue)); }catch(_) {}
+    }
+    if (e.key === CTRL_KEY && e.newValue){
+      // ミュート制御同期
       try{
-        const data = JSON.parse(e.newValue);
-        showSosBanner(data);
+        const msg = JSON.parse(e.newValue);
+        if (msg.cmd === 'mute'){ hideSosBanner(); }
+        // 'unmute' はバナーを即表示しない（次の SOS を待つ想定）
       }catch(_){}
     }
   });
 
-  // ===== 公開API（全ページから使えるように window に露出） =====
-  /** 任意ページで呼ぶ：バナーを直接出す */
-  window.showSosBanner = showSosBanner;
-
-  /** 任意ページで呼ぶ：全タブ・全ページへ通知（localStorage ブロードキャスト） */
+  // 公開API
+  /** 全タブへSOS配信（同タブも即時表示） */
   window.broadcastSOS = function(payload){
-    try{ localStorage.setItem('sos_broadcast', JSON.stringify(payload || {})); }catch(e){}
-    // 同タブでも即時表示
-    showSosBanner(payload || {});
+    localStorage.setItem(CAST_KEY, JSON.stringify(payload || {}));
+    if (!isMuted()) showSosBanner(payload || {});
   };
+  /** 明示的に表示（ミュート中は出ない） */
+  window.showSosBanner = showSosBanner;
+  /** ミュート/解除API（任意ページで利用可） */
+  window.muteSOS = muteSOS;
+  window.unmuteSOS = unmuteSOS;
+
+  // 初期状態：ミュートなら確実に非表示化
+  if (isMuted()) hideSosBanner();
 })();
 </script>
 </body>
