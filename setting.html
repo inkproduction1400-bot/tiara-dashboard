@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>設定 | アカウント / 権限</title>
+<style>
+  :root{
+    --gap:6px; --radius:10px; --bg:#f7f7f8; --panel:#ffffff; --text:#222;
+    --muted:#667085; --line:#e5e7eb; --accent:#2563eb; --accent-2:#0ea5e9;
+    --ok:#16a34a; --warn:#b45309; --danger:#dc2626;
+    --sidebar:#0f172a; --sidebarText:#e2e8f0;
+    --sidebarW:160px; --wrapW:1160px; --shadow:0 8px 24px rgba(16,24,40,.08);
+    --control-h:38px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+  /* Sidebar */
+  .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+  .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 6px;}
+  .side-logo img{width:86%; height:auto; object-fit:contain}
+  .side-group{margin-bottom:8px;}
+  .side-sec{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9;}
+  .side-list{list-style:none;margin:0;padding:4px}
+  .side-list a{display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:8px; font-size:12px; color:var(--sidebarText); text-decoration:none}
+  .side-list a:hover{background:rgba(255,255,255,.06)}
+  .side-list a.active{background:rgba(255,255,255,.12)}
+
+  /* Main */
+  .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+  header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+  .wrap{max-width:var(--wrapW); margin:0 auto; padding:10px 12px;}
+  .head-top{display:grid; grid-template-columns: 1fr auto auto; align-items:center; column-gap:12px; row-gap:6px;}
+  .title{font-size:16px; font-weight:700; margin:0;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-self:end;}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+  .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
+  .logout-btn{background:#fff; color:#111; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer}
+  .logout-btn:hover{background:#f8fafc}
+
+  /* Content */
+  .content{flex:1 1 auto; display:flex; flex-direction:column; overflow:auto;}
+  .section{max-width:var(--wrapW); margin:12px auto; padding:14px; background:#fff; border:1px solid var(--line); border-radius:12px;}
+  .sec-title{font-weight:800; margin:0 0 10px 0; font-size:14px}
+  .grid{display:grid; grid-template-columns: 180px 1fr 180px 1fr; gap:12px 14px; align-items:center}
+  .grid.single{grid-template-columns: 180px 1fr}
+  .label{color:#475569; font-size:12px}
+  .ctrl input,.ctrl select{width:100%; height:var(--control-h); padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:12px; background:#fff;}
+  .ctrl input:focus,.ctrl select:focus{outline:none; border-color:#93c5fd; box-shadow:0 0 0 3px rgba(147,197,253,.35)}
+  .row{display:flex; gap:8px; flex-wrap:wrap}
+  .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .btn.success{background:var(--ok); color:#fff; border-color:var(--ok)}
+  .btn.ghost{background:#fff}
+  .btn.danger{background:#fee2e2; border-color:#fecaca; color:#b91c1c}
+  .table{width:100%; border-collapse:collapse; font-size:13px}
+  .table th,.table td{border-bottom:1px solid #f1f5f9; padding:10px; vertical-align:middle}
+  .table th{background:#f8fafc; text-align:left; color:#475569; font-weight:800}
+  .tag{display:inline-flex; align-items:center; gap:4px; padding:2px 8px; font-size:11px; border-radius:999px; border:1px solid var(--line); background:#fff}
+  .tag.tmp{background:#f0f9ff; border-color:#bae6fd; color:#0369a1}
+  .tag.delegate{background:#fef9c3; border-color:#fde68a; color:#854d0e}
+  .muted{color:#64748b; font-size:12px}
+
+  /* Modal */
+  .modal{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:9999}
+  .modal-content{background:#fff; border:1px solid #eef2f7; box-shadow:var(--shadow); width:96%; max-width:980px; max-height:92vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden;}
+  .modal-header{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line);}
+  .modal-title{font-weight:800; font-size:16px;}
+  .m-body{flex:1 1 auto; overflow:auto; padding:14px; background:#fafafa;}
+  .m-actions{display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--line); background:#fff;}
+
+  /* Permission matrix */
+  .perm-grid{display:grid; grid-template-columns: 1fr repeat(4,110px); gap:8px; align-items:center}
+  .perm-grid .head{font-size:12px; color:#475569; font-weight:800}
+  .switch{display:flex; align-items:center; gap:8px}
+  .switch input{width:18px; height:18px}
+
+  @media (max-width: 920px){
+    .grid{grid-template-columns:180px 1fr}
+    .perm-grid{grid-template-columns:1fr 100px 100px 100px 100px}
+  }
+</style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo"><a href="dashboard.html"><img src="img/logo4.png" alt="LOGO"/></a></div>
+    <div class="side-group">
+      <div class="side-sec">運用機能</div>
+      <ul class="side-list">
+        <li><a href="dashboard.html">ダッシュボード</a></li>
+        <li><a href="schedule.html">スケジュール</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">管理機能</div>
+      <ul class="side-list">
+        <li><a href="cast.html">キャスト管理</a></li>
+        <li><a href="shops.html">店舗管理</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">通信機能</div>
+      <ul class="side-list">
+        <li><a href="chat.html">チャット（LINE）</a></li>
+        <li><a href="sos.html">SOSアラート</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">設定機能</div>
+      <ul class="side-list">
+        <li><a href="request.html">申請・承認</a></li>
+        <li><a class="active" href="setting.html">設定</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="head-top">
+          <h1 class="title">設定</h1>
+          <div></div>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span> <span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="logout-btn" onclick="location.href='index.html'">ログアウト</button>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- Self settings -->
+      <section class="section" id="selfSec">
+        <h2 class="sec-title">自分のアカウント設定</h2>
+        <div class="grid single">
+          <div class="label">表示名</div><div class="ctrl"><input id="selfName"></div>
+          <div class="label">ログインID</div><div class="ctrl"><input id="selfLogin"></div>
+          <div class="label">新しいパスワード</div>
+          <div class="ctrl"><input id="selfPw" type="password" placeholder="••••••"><div class="muted" style="margin-top:6px">空欄のまま保存でパスワードは変更しません（デモ動作）</div></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="btnSelfSave">保存</button>
+        </div>
+      </section>
+
+      <!-- Admin only -->
+      <section class="section" id="adminSec">
+        <h2 class="sec-title">ユーザー & 権限（管理者のみ）</h2>
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn" id="btnNewUser">＋ 新規ユーザー</button>
+          <span class="muted">一時権限・代理アクセスは有効期限で自動失効します</span>
+        </div>
+        <table class="table" id="userTable">
+          <thead>
+            <tr>
+              <th style="width:180px">表示名</th>
+              <th style="width:120px">ロール</th>
+              <th style="width:200px">ログインID</th>
+              <th>一時権限</th>
+              <th>代理アクセス</th>
+              <th style="width:320px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="userTbody"></tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <!-- Permission modal -->
+  <div id="permModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="permTitle">権限編集</div>
+        <div class="row">
+          <button class="btn" onclick="closePerm()">閉じる</button>
+          <button class="btn success" onclick="savePerm()">保存</button>
+        </div>
+      </div>
+      <div class="m-body">
+        <div class="section">
+          <div class="sec-title">ページアクセス</div>
+          <div class="perm-grid" id="permGridHead">
+            <div></div><div class="head">閲覧</div><div class="head">編集</div><div class="head">作成</div><div class="head">削除</div>
+          </div>
+          <div id="permGridBody"></div>
+        </div>
+
+        <div class="section">
+          <div class="sec-title">一時権限を付与</div>
+          <div class="grid single">
+            <div class="label">開始日</div><div class="ctrl"><input type="date" id="tmpFrom"></div>
+            <div class="label">終了日</div><div class="ctrl"><input type="date" id="tmpTo"></div>
+            <div class="label">対象ページ</div>
+            <div class="ctrl">
+              <select id="tmpScope" multiple style="height:100px"></select>
+              <div class="muted" style="margin-top:6px">複数選択可（Windows: Ctrl / Mac: Command）</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" onclick="addTempGrant()">＋ 追加</button>
+          </div>
+
+          <div class="sec-title" style="margin-top:12px">現在の一時権限</div>
+          <table class="table">
+            <thead><tr><th>期間</th><th>ページ</th><th style="width:120px">操作</th></tr></thead>
+            <tbody id="tmpTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="sec-title">代理アクセス（担当者委任）</div>
+          <div class="grid single">
+            <div class="label">代理元（誰の代理として）</div>
+            <div class="ctrl"><select id="dlgTarget"></select></div>
+            <div class="label">開始日</div><div class="ctrl"><input type="date" id="dlgFrom"></div>
+            <div class="label">終了日</div><div class="ctrl"><input type="date" id="dlgTo"></div>
+            <div class="label">業務範囲</div>
+            <div class="ctrl">
+              <select id="dlgScopes" multiple style="height:120px"></select>
+              <div class="muted" style="margin-top:6px">例：キャスト管理（配置・割当）/ スケジュール（シフト編集）など</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" onclick="addDelegation()">＋ 追加</button>
+          </div>
+
+          <div class="sec-title" style="margin-top:12px">現在の代理アクセス</div>
+          <table class="table">
+            <thead><tr><th>代理元</th><th>期間</th><th>範囲</th><th style="width:120px">操作</th></tr></thead>
+            <tbody id="dlgTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New user modal -->
+  <div id="newUserModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">新規ユーザー</div>
+        <div class="row">
+          <button class="btn" onclick="closeNew()">閉じる</button>
+          <button class="btn success" onclick="createUser()">作成</button>
+        </div>
+      </div>
+      <div class="m-body">
+        <div class="section">
+          <div class="grid single">
+            <div class="label">表示名</div><div class="ctrl"><input id="nuName"></div>
+            <div class="label">ロール</div>
+            <div class="ctrl">
+              <select id="nuRole">
+                <option value="STAFF">担当者</option>
+                <option value="ADMIN">管理者</option>
+              </select>
+            </div>
+            <div class="label">ログインID</div><div class="ctrl"><input id="nuLogin"></div>
+            <div class="label">初期パスワード</div><div class="ctrl"><input id="nuPw" placeholder="任意（空なら自動）"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ===== 定義 ===== */
+const PAGES = ['dashboard','schedule','cast','shops','chat','sos','request','setting'];
+const PAGE_LABEL = {
+  dashboard:'ダッシュボード', schedule:'スケジュール', cast:'キャスト管理', shops:'店舗管理',
+  chat:'チャット（LINE）', sos:'SOSアラート', request:'申請・承認', setting:'設定'
+};
+// 代理アクセスで選べる“業務範囲”の粒度
+const DELEG_SCOPES = [
+  {key:'cast.assign', label:'キャスト管理（配置・割当）'},
+  {key:'cast.editAll', label:'キャスト管理（他担当分を編集）'},
+  {key:'schedule.edit', label:'スケジュール（シフト編集）'},
+  {key:'request.process', label:'申請・承認（他担当の処理）'},
+];
+
+/* ===== ストレージ ===== */
+const STORAGE_KEY = 'settings_v2_delegate';
+
+let db = {
+  users: [
+    { id:'u-admin', name:'管理者', role:'ADMIN', login:'admin', pw:'admin', perm: basePerm('ADMIN'), temp:[], delegate:[] },
+    { id:'u-tanaka', name:'田中', role:'STAFF', login:'tanaka', pw:'pass', perm: basePerm('STAFF'), temp:[], delegate:[] },
+    { id:'u-sato', name:'佐藤', role:'STAFF', login:'sato', pw:'pass', perm: basePerm('STAFF'), temp:[], delegate:[] },
+    { id:'u-suzuki', name:'鈴木', role:'STAFF', login:'suzuki', pw:'pass', perm: basePerm('STAFF'), temp:[], delegate:[] },
+  ],
+  session: { role:'ADMIN', userId:'u-admin' }
+};
+function basePerm(role){
+  const all = {};
+  PAGES.forEach(p=>{
+    all[p] = {view:true, edit: role==='ADMIN', create: role==='ADMIN', del: role==='ADMIN'};
+  });
+  if(role==='STAFF'){
+    ['dashboard','cast','request','setting'].forEach(p=>{
+      all[p] = {view:true, edit: p!=='setting', create:false, del:false};
+    });
+    ['schedule','shops','chat','sos'].forEach(p=>{
+      all[p] = {view:false, edit:false, create:false, del:false};
+    });
+  }
+  return all;
+}
+
+/* ===== 永続化 ===== */
+(function load(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    if(saved.users){ db.users = saved.users; }
+    if(saved.session){ db.session = saved.session; }
+  }catch(e){}
+})();
+function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+
+/* ===== ヘッダー ログイン切替（デモ） ===== */
+const loginSelect = document.getElementById('loginSelect');
+loginSelect.value = (db.session.role + ':' + (db.users.find(u=>u.id===db.session.userId)?.login||'admin'));
+loginSelect.addEventListener('change', ()=>{
+  const [role,login] = loginSelect.value.split(':');
+  const target = db.users.find(u=>u.login===login);
+  db.session = {role, userId: target?.id || 'u-admin'};
+  document.getElementById('roleBadge').textContent = (role==='ADMIN'?'管理者':'担当者');
+  persist(); render();
+});
+document.getElementById('roleBadge').textContent = (db.session.role==='ADMIN'?'管理者':'担当者');
+
+/* ===== 自分の設定 ===== */
+function renderSelf(){
+  const me = getMe();
+  document.getElementById('selfName').value = me.name;
+  document.getElementById('selfLogin').value = me.login;
+  document.getElementById('selfPw').value = '';
+}
+document.getElementById('btnSelfSave').onclick = ()=>{
+  const me = getMe();
+  me.name  = document.getElementById('selfName').value.trim() || me.name;
+  me.login = document.getElementById('selfLogin').value.trim() || me.login;
+  const pw = document.getElementById('selfPw').value.trim();
+  if(pw) me.pw = pw;
+  persist();
+  alert('保存しました（デモ）');
+  render();
+};
+
+/* ===== ユーザー一覧 ===== */
+function renderUsers(){
+  const tbody = document.getElementById('userTbody');
+  // 期限切れ掃除
+  for(const u of db.users){
+    u.temp = (u.temp||[]).filter(g=> !isExpired(g.to));
+    u.delegate = (u.delegate||[]).filter(g=> !isExpired(g.to));
+  }
+  tbody.innerHTML = db.users.map(u=>{
+    const tempTags = (u.temp||[]).map(g=>{
+      const pages = g.pages.map(p=>PAGE_LABEL[p]).join('・');
+      return `<span class="tag tmp">${g.from}〜${g.to}：${pages}</span>`;
+    }).join(' ') || '<span class="muted">なし</span>';
+
+    const delegTags = (u.delegate||[]).map(g=>{
+      const src = getUserName(g.fromUserId);
+      const scopes = g.scopes.map(k=> DELEG_SCOPES.find(s=>s.key===k)?.label||k).join('・');
+      return `<span class="tag delegate">${esc(src)} の代理 / ${g.from}〜${g.to} / ${scopes}</span>`;
+    }).join(' ') || '<span class="muted">なし</span>';
+
+    return `<tr>
+      <td>${esc(u.name)}</td>
+      <td>${u.role==='ADMIN'?'管理者':'担当者'}</td>
+      <td>${esc(u.login)}</td>
+      <td>${tempTags}</td>
+      <td>${delegTags}</td>
+      <td class="row">
+        <button class="btn" onclick="openPerm('${u.id}')">権限編集</button>
+        <button class="btn" onclick="openTemp('${u.id}')">一時権限</button>
+        <button class="btn" onclick="openDelegate('${u.id}')">代理アクセス</button>
+        <button class="btn danger" onclick="resetPw('${u.id}')">PWリセット</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===== 権限モーダル ===== */
+let editingUserId = null;
+function openPerm(uid){
+  editingUserId = uid;
+  const u = db.users.find(x=>x.id===uid);
+  document.getElementById('permTitle').textContent = `権限編集（${u.name}）`;
+  buildPermGrid(u.perm);
+  buildTempTable(u.temp);
+  fillScopeSelect();
+  // 代理アクセスUIも準備
+  fillDelegateTargets(uid);
+  fillDelegateScopes();
+  buildDelegateTable(u.delegate);
+  document.getElementById('permModal').style.display='flex';
+}
+function openTemp(uid){ openPerm(uid); }
+function openDelegate(uid){ openPerm(uid); }
+function closePerm(){ document.getElementById('permModal').style.display='none'; }
+
+function buildPermGrid(perm){
+  const body = document.getElementById('permGridBody');
+  body.innerHTML = PAGES.map(p=>{
+    const x = perm[p] || {view:false, edit:false, create:false, del:false};
+    return `<div class="perm-grid">
+      <div>${PAGE_LABEL[p]}</div>
+      ${['view','edit','create','del'].map(k=>{
+        const id=`p_${p}_${k}`;
+        return `<div class="switch"><input id="${id}" type="checkbox" ${x[k]?'checked':''}></div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+function savePerm(){
+  const u = db.users.find(x=>x.id===editingUserId);
+  const newPerm = {};
+  PAGES.forEach(p=>{
+    newPerm[p] = {
+      view:  document.getElementById(`p_${p}_view`).checked,
+      edit:  document.getElementById(`p_${p}_edit`).checked,
+      create:document.getElementById(`p_${p}_create`).checked,
+      del:   document.getElementById(`p_${p}_del`).checked,
+    };
+  });
+  u.perm = newPerm;
+  persist();
+  closePerm();
+  render();
+}
+
+/* ===== 一時権限 ==== */
+function fillScopeSelect(){
+  const sel = document.getElementById('tmpScope');
+  sel.innerHTML = PAGES.map(p=>`<option value="${p}">${PAGE_LABEL[p]}</option>`).join('');
+}
+function addTempGrant(){
+  const from = document.getElementById('tmpFrom').value;
+  const to   = document.getElementById('tmpTo').value;
+  const pages = Array.from(document.getElementById('tmpScope').selectedOptions).map(o=>o.value);
+  if(!from || !to || pages.length===0){ alert('期間と対象ページを選択してください'); return; }
+  const u = db.users.find(x=>x.id===editingUserId);
+  u.temp = u.temp || [];
+  u.temp.push({from, to, pages});
+  document.getElementById('tmpFrom').value = '';
+  document.getElementById('tmpTo').value = '';
+  document.getElementById('tmpScope').selectedIndex = -1;
+  buildTempTable(u.temp);
+  persist(); renderUsers();
+}
+function buildTempTable(list){
+  const tbody = document.getElementById('tmpTbody');
+  tbody.innerHTML = (list||[]).map((g,i)=>`
+    <tr>
+      <td>${esc(g.from)}〜${esc(g.to)}</td>
+      <td>${g.pages.map(p=>PAGE_LABEL[p]).join('・')}</td>
+      <td><button class="btn ghost" onclick="removeTemp(${i})">削除</button></td>
+    </tr>
+  `).join('') || `<tr><td colspan="3" class="muted">なし</td></tr>`;
+}
+function removeTemp(idx){
+  const u = db.users.find(x=>x.id===editingUserId);
+  u.temp.splice(idx,1);
+  buildTempTable(u.temp);
+  persist(); renderUsers();
+}
+function isExpired(to){
+  if(!to) return false;
+  const today = new Date().toISOString().slice(0,10);
+  return today > to;
+}
+
+/* ===== 代理アクセス（担当者委任） ===== */
+function fillDelegateTargets(forUserId){
+  const sel = document.getElementById('dlgTarget');
+  const list = db.users.filter(u=> u.id!==forUserId); // 自分以外
+  sel.innerHTML = list.map(u=>`<option value="${u.id}">${esc(u.name)}（${u.role==='ADMIN'?'管理者':'担当者'}）</option>`).join('');
+}
+function fillDelegateScopes(){
+  const sel = document.getElementById('dlgScopes');
+  sel.innerHTML = DELEG_SCOPES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+}
+function addDelegation(){
+  const fromUserId = document.getElementById('dlgTarget').value;
+  const from = document.getElementById('dlgFrom').value;
+  const to   = document.getElementById('dlgTo').value;
+  const scopes = Array.from(document.getElementById('dlgScopes').selectedOptions).map(o=>o.value);
+  if(!fromUserId || !from || !to || scopes.length===0){ alert('代理元・期間・範囲を入力してください'); return; }
+  const u = db.users.find(x=>x.id===editingUserId);
+  u.delegate = u.delegate || [];
+  u.delegate.push({fromUserId, from, to, scopes});
+  // クリア
+  document.getElementById('dlgFrom').value = '';
+  document.getElementById('dlgTo').value = '';
+  document.getElementById('dlgScopes').selectedIndex = -1;
+  buildDelegateTable(u.delegate);
+  persist(); renderUsers();
+}
+function buildDelegateTable(list){
+  const tbody = document.getElementById('dlgTbody');
+  tbody.innerHTML = (list||[]).map((g,i)=>`
+    <tr>
+      <td>${esc(getUserName(g.fromUserId))}</td>
+      <td>${esc(g.from)}〜${esc(g.to)}</td>
+      <td>${g.scopes.map(k=> DELEG_SCOPES.find(s=>s.key===k)?.label||k).join('・')}</td>
+      <td><button class="btn ghost" onclick="removeDelegation(${i})">削除</button></td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" class="muted">なし</td></tr>`;
+}
+function removeDelegation(idx){
+  const u = db.users.find(x=>x.id===editingUserId);
+  u.delegate.splice(idx,1);
+  buildDelegateTable(u.delegate);
+  persist(); renderUsers();
+}
+
+/* ===== 新規ユーザー ===== */
+document.getElementById('btnNewUser').onclick = ()=>{ 
+  ['nuName','nuLogin','nuPw'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('nuRole').value='STAFF';
+  document.getElementById('newUserModal').style.display='flex';
+};
+function closeNew(){ document.getElementById('newUserModal').style.display='none'; }
+function createUser(){
+  const name = document.getElementById('nuName').value.trim();
+  const role = document.getElementById('nuRole').value;
+  const login= document.getElementById('nuLogin').value.trim();
+  const pw   = document.getElementById('nuPw').value.trim() || Math.random().toString(36).slice(2,8);
+  if(!name || !login){ alert('表示名とログインIDを入力してください'); return; }
+  if(db.users.some(u=>u.login===login)){ alert('同じログインIDが存在します'); return; }
+  db.users.push({ id:'u-'+Date.now(), name, role, login, pw, perm:basePerm(role), temp:[], delegate:[] });
+  persist(); closeNew(); render();
+  alert(`作成しました（初期PW: ${pw}）`);
+}
+
+/* ===== パスワードリセット（デモ） ===== */
+function resetPw(uid){
+  const u = db.users.find(x=>x.id===uid);
+  const pw = Math.random().toString(36).slice(2,8);
+  u.pw = pw; persist();
+  alert(`初期化しました。新PW: ${pw}`);
+}
+
+/* ===== Util ===== */
+function getMe(){ return db.users.find(u=>u.id===db.session.userId) || db.users[0]; }
+function getUserName(id){ return db.users.find(u=>u.id===id)?.name || '不明'; }
+function esc(s){ return (s??'').toString().replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+/* ===== 画面描画 ===== */
+function render(){
+  renderSelf();
+  const isAdmin = db.session.role==='ADMIN';
+  document.getElementById('adminSec').style.display = isAdmin ? 'block' : 'none';
+  if(isAdmin) renderUsers();
+}
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>申請・承認 | 面接申込 / 面接 / 本登録申請</title>
+<style>
+  :root{
+    --gap:6px; --radius:10px; --bg:#f7f7f8; --panel:#ffffff; --text:#222;
+    --muted:#667085; --line:#e5e7eb; --accent:#2563eb; --accent-2:#0ea5e9;
+    --ok:#16a34a; --warn:#b45309; --danger:#dc2626;
+    --sidebar:#0f172a; --sidebarText:#e2e8f0;
+    --sidebarW:160px; --wrapW:1160px; --shadow:0 8px 24px rgba(16,24,40,.08);
+
+    /* フローUI用カラー（スクショ風の赤系） */
+    --flowBorder:#e46a5d;
+    --flowPale:#fff4f2;
+    --flowNum:#e25544;
+
+    /* フォームの高さ */
+    --control-h:38px;
+    --control-pad:8px 12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;overflow:hidden;}
+
+  /* Sidebar（共通） */
+  .sidebar{position:fixed; inset:0 auto 0 0; width:var(--sidebarW); background:var(--sidebar); color:var(--sidebarText); display:flex; flex-direction:column; padding:14px 10px; gap:12px;}
+  .side-logo{display:flex; align-items:center; justify-content:center; padding:8px 6px;}
+  .side-logo img{width:86%; height:auto; object-fit:contain}
+  .side-group{margin-bottom:8px;}
+  .side-sec{padding:4px 6px 0; font-weight:700; font-size:12px; opacity:.9;}
+  .side-list{list-style:none;margin:0;padding:4px}
+  .side-list a{display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:8px; cursor:pointer; font-size:12px; color:var(--sidebarText); text-decoration:none}
+  .side-list a:hover{background:rgba(255,255,255,.06)}
+  .side-list a.active{background:rgba(255,255,255,.12)}
+
+  /* Main */
+  .main{margin-left:var(--sidebarW); height:100vh; display:flex; flex-direction:column;}
+  header{flex:0 0 auto; background:rgba(247,247,248,0.9); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid var(--line);}
+  .wrap{max-width:var(--wrapW); margin:0 auto; padding:10px 12px;}
+  .head-top{display:grid; grid-template-columns: 1fr auto auto; align-items:center; column-gap:12px; row-gap:6px;}
+  .title{font-size:16px; font-weight:700; margin:0;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-self:end;}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#fff; border:1px solid var(--line); font-size:12px}
+  .role{font-weight:700}
+  .login{display:flex; align-items:center; gap:6px;}
+  .login select{border:1px solid var(--line); border-radius:8px; padding:6px 8px; background:#fff; font-size:12px}
+  .print-btn{background:var(--accent); color:#fff; border:1px solid var(--accent); border-radius:8px; padding:6px 10px; font-size:12px}
+  .logout-btn{background:#fff; color:#111; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer}
+  .logout-btn:hover{background:#f8fafc}
+
+  /* Toolbar */
+  .toolbar{display:flex; align-items:center; gap:12px; padding:8px 0; font-size:12px}
+  .toolbar .spacer{flex:1 1 auto}
+  .btn{border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 12px; font-size:12px; cursor:pointer}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .btn.success{background:var(--ok); color:#fff; border-color:var(--ok)}
+  .btn.ghost{background:#fff; color:#111}
+  .btn.warn{background:#fde68a; border-color:#fbbf24}
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:12px}
+  .chip.toggle.on{background:#ecfeff; border-color:#bae6fd; color:#0369a1; font-weight:800}
+  .chip .n{font-weight:800}
+
+  /* Flow tabs（スクショ風） */
+  .flow{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap}
+  .flow .step{
+    position:relative; display:flex; gap:10px; align-items:flex-start;
+    background:#fff; border:2px solid var(--flowBorder); border-radius:12px;
+    padding:10px 14px; min-width:220px; cursor:pointer; text-align:left;
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+  .flow .step:hover{ transform:translateY(-1px); box-shadow:0 4px 14px rgba(16,24,40,.08);}
+  .flow .step:focus-visible{ outline:3px solid #93c5fd; outline-offset:2px;}
+  .flow .num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:999px;
+    font-weight:900; color:#fff; background:var(--flowNum); flex:0 0 26px;
+  }
+  .flow .meta{display:flex; flex-direction:column; gap:2px}
+  .flow .ttl{font-weight:800; font-size:13px; color:#111}
+  .flow .cap{font-size:11px; color:#6b7280}
+  .flow .arrow{align-self:center; color:#e8796e; font-weight:900; padding:0 4px; user-select:none;}
+  .flow .step.active{
+    border-color:var(--accent-2); box-shadow:0 6px 20px rgba(2,132,199,.12);
+    background:linear-gradient(0deg,#f0f9ff, #fff);
+  }
+
+  /* Panel/Table */
+  .content{flex:1 1 auto; display:flex; flex-direction:column;}
+  .panel{flex:1 1 auto; background:#fff; border:1px solid var(--line); margin:0; width:100%; max-width:none; border-radius:0; display:flex; flex-direction:column;}
+  .table{width:100%; border-collapse:collapse; font-size:13px}
+  .table th,.table td{border-bottom:1px solid #f1f5f9; padding:10px; vertical-align:middle}
+  .table th{background:#f8fafc; text-align:left; color:#475569; font-weight:800}
+  .row-actions{display:flex; gap:8px; flex-wrap:wrap}
+  .tag{display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-size:11px; border-radius:999px; border:1px solid var(--line); background:#fff}
+  .tag.ok{background:#f0fdf4; border-color:#bbf7d0; color:#166534}
+  .tag.rej{background:#fff1f2; border-color:#fecdd3; color:#be123c}
+  .muted{color:#64748b; font-size:12px}
+
+  /* Modal */
+  .modal{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:9999}
+  .modal-content{background:#fff; border:1px solid #eef2f7; box-shadow:var(--shadow); width:96%; max-width:1080px; max-height:92vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden;}
+  .modal-header{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line);}
+  .modal-title{font-weight:800; font-size:16px;}
+  .m-body{flex:1 1 auto; overflow:auto; padding:16px; background:#fafafa;}
+  .m-actions{display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--line); background:#fff;}
+  .box{border:1px solid var(--line); border-radius:12px; background:#fff; padding:12px; margin-bottom:10px;}
+
+  /* Form layout */
+  .grid-2{display:grid; grid-template-columns: 1fr 1fr; gap:14px 16px;}
+  .grid-4{display:grid; grid-template-columns: 140px 1fr 140px 1fr; gap:12px 14px; align-items:center;}
+  .ilabel{color:#475569; font-size:12px;}
+  .ivalue input,.ivalue select{width:100%; height:var(--control-h); padding:var(--control-pad); border:1px solid #e5e7eb; border-radius:8px; font-size:12px; background:#fff;}
+  .ivalue textarea{width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:12px; background:#fff; height:96px; resize:vertical}
+  .ivalue input:focus,.ivalue select:focus,.ivalue textarea:focus{outline:none; border-color:#93c5fd; box-shadow:0 0 0 3px rgba(147,197,253,.35)}
+  /* セレクトの矢印を明示 */
+  .ivalue select{
+    -webkit-appearance:none; appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat; background-position:right 10px center; background-size:16px;
+    padding-right:34px;
+  }
+  .note{font-size:12px; color:#64748b;}
+
+  /* Upload */
+  .upload{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .avatar{width:180px; aspect-ratio:3/4; border-radius:12px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; color:#64748b; overflow:hidden}
+  .avatar img{width:100%; height:100%; object-fit:cover}
+  .req{color:#dc2626; font-weight:800; margin-left:4px;}
+
+  .section{border:1px solid var(--line); border-radius:12px; background:#fff; padding:14px; margin-bottom:14px;}
+  .section .title{font-weight:800; margin-bottom:10px}
+  .grid-3c{display:grid; grid-template-columns: 150px 1fr 150px 1fr 150px 1fr; gap:12px 14px; align-items:center;}
+  .grid-2c{display:grid; grid-template-columns: 150px 1fr 150px 1fr; gap:12px 14px; align-items:center;}
+  .full{grid-column: 1 / -1;}
+
+  /* 狭い幅での最適化 */
+  @media (max-width: 1100px){
+    .grid-2{grid-template-columns:1fr}
+  }
+  @media (max-width: 780px){
+    .grid-3c{grid-template-columns:150px 1fr}
+    .grid-2c{grid-template-columns:150px 1fr}
+  }
+</style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo"><a href="dashboard.html"><img src="img/logo4.png" alt="LOGO"/></a></div>
+    <div class="side-group">
+      <div class="side-sec">運用機能</div>
+      <ul class="side-list">
+        <li><a href="dashboard.html">ダッシュボード</a></li>
+        <li><a href="schedule.html">スケジュール</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">管理機能</div>
+      <ul class="side-list">
+        <li><a href="cast.html">キャスト管理</a></li>
+        <li><a href="shops.html">店舗管理</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">通信機能</div>
+      <ul class="side-list">
+        <li><a href="chat.html">チャット（LINE）</a></li>
+        <li><a href="sos.html">SOSアラート</a></li>
+      </ul>
+    </div>
+    <div class="side-group">
+      <div class="side-sec">設定機能</div>
+      <ul class="side-list">
+        <li><a class="active" href="request.html">申請・承認</a></li>
+        <li><a href="setting.html">設定</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="wrap">
+        <div class="head-top">
+          <h1 class="title">申請・承認</h1>
+          <div></div>
+          <div class="head-right">
+            <span class="badge"><span class="label">ロール</span> <span class="role" id="roleBadge">管理者</span></span>
+            <div class="login">
+              <label for="loginSelect" class="label">ログイン:</label>
+              <select id="loginSelect">
+                <option value="ADMIN:admin">管理者（admin）</option>
+                <option value="STAFF:tanaka">担当者（田中）</option>
+                <option value="STAFF:sato">担当者（佐藤）</option>
+                <option value="STAFF:suzuki">担当者（鈴木）</option>
+              </select>
+            </div>
+            <button class="logout-btn" onclick="location.href='index.html'">ログアウト</button>
+            <button class="print-btn" onclick="window.print()">印刷</button>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <!-- フロー式タブ -->
+          <div class="flow" role="tablist" aria-label="進行フロー">
+            <button id="tabApply"   class="step active" role="tab" aria-selected="true" data-tab="apply">
+              <span class="num">1</span>
+              <span class="meta">
+                <span class="ttl">面接申込一覧</span>
+                <span class="cap">応募受付・面接日設定</span>
+              </span>
+            </button>
+            <div class="arrow">›</div>
+            <button id="tabInterview" class="step" role="tab" aria-selected="false" data-tab="interview">
+              <span class="num">2</span>
+              <span class="meta">
+                <span class="ttl">面接</span>
+                <span class="cap">当日入力・登録準備</span>
+              </span>
+            </button>
+            <div class="arrow">›</div>
+            <button id="tabPreReg" class="step" role="tab" aria-selected="false" data-tab="prereg">
+              <span class="num">3</span>
+              <span class="meta">
+                <span class="ttl">本登録申請</span>
+                <span class="cap">承認/却下・ID発行</span>
+              </span>
+            </button>
+          </div>
+
+          <button class="btn" id="btnNewApply">＋ 新規申込</button>
+
+          <div class="spacer"></div>
+
+          <!-- 承認/却下トグル（本登録申請タブでのみ表示） -->
+          <div id="prFilters" style="display:none; gap:8px; align-items:center;">
+            <button id="fltApproved" class="chip toggle" aria-pressed="false">承認済 <span class="n" id="cntApproved">0</span></button>
+            <button id="fltRejected" class="chip toggle" aria-pressed="false">却下済 <span class="n" id="cntRejected">0</span></button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="panel">
+        <table class="table" id="tbl">
+          <thead><tr id="theadRow"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 面接申込（新規）モーダル ===== -->
+  <div id="ivModal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="ivTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="ivTitle">新規 面接申込</div>
+        <div class="row-actions">
+          <button class="btn" onclick="closeIv()">閉じる</button>
+          <button class="btn primary" id="ivSave">保存</button>
+        </div>
+      </div>
+      <div class="m-body">
+        <div class="box">
+          <div class="grid-4">
+            <div class="ilabel">名前<span class="req">*</span></div><div class="ivalue"><input id="ivName" placeholder="例）あい"></div>
+            <div class="ilabel">年齢</div><div class="ivalue"><input id="ivAge" type="number" min="16" max="60" placeholder="20"></div>
+            <div class="ilabel">電話番号<span class="req">*</span></div><div class="ivalue"><input id="ivPhone" placeholder="090-0000-0000"></div>
+            <div class="ilabel">媒体</div>
+            <div class="ivalue"><select id="ivMedia"><option>ウェブ</option><option>電話</option><option>LINE</option></select></div>
+            <div class="ilabel">面接日</div><div class="ivalue"><input id="ivDate" type="date"></div>
+            <div class="ilabel">メモ</div><div class="ivalue" style="grid-column: span 3;"><textarea id="ivMemo" placeholder="連絡希望時間など"></textarea></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 面接/本登録申請 詳細モーダル ===== -->
+  <div id="regModal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="regTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="regTitle">面接フォーム</div>
+        <div class="row-actions" id="regHeaderBtns"></div>
+      </div>
+
+      <div class="m-body">
+        <div class="grid-2">
+          <!-- 左カラム -->
+          <div>
+            <!-- 写真 -->
+            <div class="section">
+              <div class="title">写真 <span class="req">*</span></div>
+              <div class="upload" style="margin-top:6px;">
+                <div class="avatar" id="regAvatar"><span>No Image</span></div>
+                <div>
+                  <input id="regPhoto" type="file" accept="image/*">
+                  <div class="note">画像を選択すると左にプレビュー表示</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 登録用 基本 -->
+            <div class="section">
+              <div class="title">登録用 基本（プロフィール・連絡先） <span class="req">*</span></div>
+              <div class="grid-2c">
+                <!-- ラベル入替：左を「氏名」、右を「ふりがな」。IDは据え置き -->
+                <div class="ilabel">氏名</div><div class="ivalue"><input id="rgKana" required></div>
+                <div class="ilabel">ふりがな</div><div class="ivalue"><input id="rgName" required></div>
+
+                <div class="ilabel">源氏名</div><div class="ivalue"><input id="rgStage" placeholder="任意"></div>
+                <div class="ilabel">生年月日</div><div class="ivalue"><input id="rgDob" type="date" required></div>
+
+                <div class="ilabel">現住所</div><div class="ivalue"><input id="rgAddr" required></div>
+                <div class="ilabel">TEL</div><div class="ivalue"><input id="rgTel" placeholder="090-xxxx-xxxx" required></div>
+
+                <div class="ilabel">アドレス</div><div class="ivalue"><input id="rgEmail" type="email" placeholder="任意"></div>
+                <div class="full"></div>
+              </div>
+            </div>
+
+            <!-- 勤務/希望 -->
+            <div class="section">
+              <div class="title">勤務 / 希望</div>
+              <div class="grid-3c">
+                <div class="ilabel">身長</div>
+                <div class="ivalue">
+                  <select id="rgHeight">
+                    <option value="">未選択</option>
+                    <option>150cm</option><option>155cm</option><option>160cm</option>
+                    <option>165cm</option><option>170cm</option><option>175cm</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">服のサイズ</div>
+                <div class="ivalue">
+                  <select id="rgCloth">
+                    <option value="">未選択</option>
+                    <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">靴のサイズ</div>
+                <div class="ivalue">
+                  <select id="rgShoe">
+                    <option value="">未選択</option>
+                    <option>22.0</option><option>22.5</option><option>23.0</option><option>23.5</option>
+                    <option>24.0</option><option>24.5</option><option>25.0</option><option>25.5</option>
+                    <option>26.0</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">出勤数</div>
+                <div class="ivalue">
+                  <select id="rgDays">
+                    <option value="">未選択</option>
+                    <option>週1</option><option>週2</option><option>週3</option><option>週4</option><option>週5+</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">勤務時間</div><div class="ivalue"><input id="rgHours" placeholder="例）19:00〜22:30"></div>
+
+                <div class="ilabel">時給</div>
+                <div class="ivalue">
+                  <select id="rgWage">
+                    <option value="">未選択</option>
+                    <option>¥3,500〜</option><option>¥4,000〜</option><option>¥4,500〜</option>
+                    <option>¥5,000〜</option><option>応相談</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">タトゥー</div>
+                <div class="ivalue"><select id="rgTattoo"><option>無</option><option>有</option></select></div>
+
+                <div class="ilabel">送迎の要否</div>
+                <div class="ivalue"><select id="rgPickup"><option>無</option><option>有</option></select></div>
+
+                <div class="ilabel">お酒の強さ</div>
+                <div class="ivalue"><select id="rgAlcohol"><option>普通</option><option>弱い</option><option>強い</option></select></div>
+
+                <div class="ilabel">水商売の経験</div>
+                <div class="ivalue">
+                  <select id="rgExp">
+                    <option value="">未選択</option>
+                    <option>未経験</option><option>半年未満</option><option>1〜2年</option><option>3年以上</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">NG店舗</div><div class="ivalue"><input id="rgNgShops" placeholder=""></div>
+                <div class="ilabel">備考</div><div class="ivalue full"><textarea id="rgNote"></textarea></div>
+              </div>
+            </div>
+
+            <!-- 本人確認（2点） -->
+            <div class="section">
+              <div class="title">本人確認書類（2点） <span class="req">*</span></div>
+              <div class="grid-2c">
+                <div class="ilabel">1点目</div>
+                <div class="ivalue">
+                  <select id="rgIdCheck1" required>
+                    <option value="">選択してください</option>
+                    <option>運転免許証</option><option>マイナンバーカード</option><option>パスポート</option>
+                    <option>在留カード</option><option>健康保険証</option><option>住民票</option>
+                  </select>
+                </div>
+                <div class="ilabel">2点目</div>
+                <div class="ivalue">
+                  <select id="rgIdCheck2" required>
+                    <option value="">選択してください</option>
+                    <option>運転免許証</option><option>マイナンバーカード</option><option>パスポート</option>
+                    <option>在留カード</option><option>健康保険証</option><option>住民票</option>
+                  </select>
+                </div>
+
+                <div class="ilabel">宣誓（飲酒運転しない）</div><div class="ivalue"><select id="rgPledge1"><option>済</option><option>未</option></select></div>
+                <div class="ilabel">宣誓（身分証紛失なし・携帯）</div><div class="ivalue"><select id="rgPledge2"><option>済</option><option>未</option></select></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右カラム -->
+          <div>
+            <div class="section">
+              <div class="title">登録用 補助（動機・比較・選定理由）</div>
+              <div class="grid-2c">
+                <div class="ilabel">知った経路</div><div class="ivalue"><input id="rgRoute" placeholder="紹介/サイト名など"></div>
+                <div class="ilabel">紹介者/サイト名</div><div class="ivalue"><input id="rgRef"></div>
+
+                <div class="ilabel">お仕事を始めるきっかけ</div><div class="ivalue full"><textarea id="rgMotivation"></textarea></div>
+                <div class="ilabel">他社比較</div><div class="ivalue"><input id="rgCompare" placeholder="1〜3社"></div>
+                <div class="ilabel">派遣会社名</div><div class="ivalue"><input id="rgAgencies" placeholder="派遣A / 派遣B"></div>
+
+                <div class="ilabel">当社を選んだ理由</div><div class="ivalue full"><textarea id="rgReason"></textarea></div>
+                <div class="ilabel">重要視ポイント</div><div class="ivalue full"><textarea id="rgPoints" placeholder="時給/終電/場所/広さ/年齢/キャリア/他"></textarea></div>
+                <div class="ilabel">その他（備考）</div><div class="ivalue full"><textarea id="rgEtc"></textarea></div>
+                <div class="ilabel">30,000円制度の所感</div><div class="ivalue full"><textarea id="rgAllowance"></textarea></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="title">承認結果</div>
+              <div id="rgResult" class="note">未承認</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="m-actions">
+        <span class="note">※ 面接モード：必須（写真/登録用基本/本人確認書類）を満たすと「保存して本登録申請へ」が有効になります。<br>※ 本登録申請タブ：承認時にログインID/初期パスワードを自動発行します（ID: A〜Z+3桁、PW: 電話下4桁）。</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ===== デモデータ＆状態 ===== */
+const STAFFS = { tanaka:{id:'tanaka',name:'田中'}, sato:{id:'sato',name:'佐藤'}, suzuki:{id:'suzuki',name:'鈴木'} };
+const STORAGE_KEY = 'apply_flow_v2';
+
+let state = {
+  login:{role:'ADMIN', user:'admin'},
+  tab:'apply',                       // 'apply' | 'interview' | 'prereg'
+  showApproved:false,
+  showRejected:false,
+  regMode:'interview',
+  openingId:null,
+  photoSet:false,
+  applies:[
+    {id:'ap-1001', name:'あい', age:20, phone:'090-1010-2010', media:'ウェブ', memo:'19時以降の連絡希望', ivDate:''},
+    {id:'ap-1002', name:'さくら', age:22, phone:'080-2222-3333', media:'LINE', memo:'', ivDate:''},
+  ],
+  scheduled:[],
+  prereg:[]
+};
+
+(function load(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    ['applies','scheduled','prereg'].forEach(k=>{ if(saved[k]) state[k]=saved[k]; });
+  }catch(e){}
+})();
+function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({applies:state.applies, scheduled:state.scheduled, prereg:state.prereg})); }
+
+/* ===== 共通UI ===== */
+const loginSelect = document.getElementById('loginSelect');
+loginSelect.addEventListener('change', ()=>{
+  const [role,user]=loginSelect.value.split(':');
+  state.login={role,user};
+  document.getElementById('roleBadge').textContent=(role==='ADMIN'?'管理者':'担当者');
+});
+
+/* ===== タブ切替（フロー） ===== */
+document.querySelectorAll('.flow .step').forEach(btn=>{
+  btn.addEventListener('click',()=> setTab(btn.dataset.tab));
+});
+function setTab(tab){
+  state.tab = tab;
+  document.querySelectorAll('.flow .step').forEach(b=>{
+    const on = b.dataset.tab===tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.getElementById('prFilters').style.display = (tab==='prereg') ? 'flex' : 'none';
+  render();
+}
+
+/* ===== フィルタ（本登録申請） ===== */
+document.getElementById('fltApproved').onclick  = (e)=>{ state.showApproved = !state.showApproved; e.currentTarget.classList.toggle('on', state.showApproved); render(); }
+document.getElementById('fltRejected').onclick  = (e)=>{ state.showRejected = !state.showRejected; e.currentTarget.classList.toggle('on', state.showRejected); render(); }
+
+/* ===== テーブル描画 ===== */
+function render(){
+  document.getElementById('cntApproved').textContent = (state.prereg.filter(x=>x.status==='APPROVED').length);
+  document.getElementById('cntRejected').textContent = (state.prereg.filter(x=>x.status==='REJECTED').length);
+
+  const theadRow = document.getElementById('theadRow');
+  const tbody = document.getElementById('tbody');
+
+  if(state.tab==='apply'){
+    theadRow.innerHTML = `
+      <th style="width:160px">名前</th>
+      <th style="width:80px">年齢</th>
+      <th style="width:160px">電話</th>
+      <th style="width:120px">媒体</th>
+      <th>メモ</th>
+      <th style="width:170px">面接日</th>
+      <th style="width:160px">操作</th>`;
+    tbody.innerHTML = state.applies.map(r=>`
+      <tr>
+        <td>${esc(r.name)}</td>
+        <td>${r.age??'-'}</td>
+        <td>${esc(r.phone||'-')}</td>
+        <td>${esc(r.media||'-')}</td>
+        <td>${esc(r.memo||'')}</td>
+        <td><input type="date" value="${esc(r.ivDate||'')}" onchange="setIvDate('${r.id}', this.value)"></td>
+        <td><button class="btn primary" onclick="toInterview('${r.id}')">面接へ</button></td>
+      </tr>
+    `).join('');
+  }
+  else if(state.tab==='interview'){
+    theadRow.innerHTML = `
+      <th style="width:200px">名前</th>
+      <th style="width:160px">電話</th>
+      <th style="width:160px">面接日</th>
+      <th>備考</th>
+      <th style="width:200px">操作</th>`;
+    const rows = state.scheduled.slice().sort((a,b)=> (a.ivDate||'').localeCompare(b.ivDate||''));
+    tbody.innerHTML = rows.map(r=>{
+      const ap = state.applies.find(a=>a.id===r.apId);
+      return `
+        <tr>
+          <td>${esc(r.name)}</td>
+          <td>${esc(r.phone||'-')}</td>
+          <td>${esc(r.ivDate||'-')}</td>
+          <td class="muted">${esc(ap?.memo||'')}</td>
+          <td><button class="btn success" onclick="startInterview('${r.id}')">面接開始</button></td>
+        </tr>`;
+    }).join('');
+  }
+  else { // prereg
+    theadRow.innerHTML = `
+      <th style="width:200px">名前</th>
+      <th style="width:160px">電話</th>
+      <th style="width:160px">ステータス</th>
+      <th>資格情報</th>
+      <th style="width:200px">操作</th>`;
+    let rows = state.prereg.slice();
+    rows = rows.filter(x=>{
+      if(state.showApproved===false && x.status==='APPROVED') return false;
+      if(state.showRejected===false && x.status==='REJECTED') return false;
+      return true;
+    });
+    const tr = rows.map(r=>{
+      const cred = r.credentials ? `ID:${r.credentials.id} / 初期PW:${r.credentials.pw}` : '';
+      const tag =
+        r.status==='APPROVED' ? `<span class="tag ok">承認済</span>` :
+        r.status==='REJECTED' ? `<span class="tag rej">却下済</span>` :
+        `<span class="tag">未処理</span>`;
+      return `
+      <tr>
+        <td><button class="btn ghost" onclick="openRegPr('${r.id}')">${esc(r.name||'-')}</button></td>
+        <td>${esc(r.phone||'-')}</td>
+        <td>${tag}</td>
+        <td>${esc(cred)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn success" onclick="approve('${r.id}')">承認</button>
+            <button class="btn ghost" onclick="reject('${r.id}')">却下</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    tbody.innerHTML = tr;
+  }
+}
+
+/* ===== 面接申込：日付設定・面接へ ===== */
+function setIvDate(id, val){
+  const t = state.applies.find(x=>x.id===id); if(!t) return;
+  t.ivDate = val || '';
+  persist();
+}
+function toInterview(id){
+  const t = state.applies.find(x=>x.id===id); if(!t) return;
+  if(!t.ivDate){ alert('面接日を選択してください'); return; }
+  if(state.scheduled.some(x=>x.apId===id)){ setTab('interview'); return; }
+  state.scheduled.push({ id:'sc-'+Date.now(), apId:id, name:t.name, phone:t.phone, ivDate:t.ivDate, detail:{} });
+  persist();
+  setTab('interview');
+}
+
+/* ===== 面接：面接開始（モーダル） ===== */
+function startInterview(scId){
+  state.regMode = 'interview';
+  state.openingId = scId;
+  openRegCommon({
+    titlePrefix: '面接フォーム',
+    name: state.scheduled.find(x=>x.id===scId)?.name || '-',
+    phone: state.scheduled.find(x=>x.id===scId)?.phone || ''
+  });
+  buildHeaderBtns();
+}
+
+/* ===== 本登録申請：詳細表示（モーダル） ===== */
+function openRegPr(rgId){
+  state.regMode = 'prereg';
+  state.openingId = rgId;
+  const r = state.prereg.find(x=>x.id===rgId);
+  openRegCommon({
+    titlePrefix: '本登録申請',
+    name: r?.name || '-',
+    phone: r?.phone || '-',
+    detail: r?.detail || {}
+  });
+  document.getElementById('rgResult').textContent =
+    (r.status==='APPROVED' ? `承認済：ID=${r.credentials?.id} / 初期PW=${r.credentials?.pw}` :
+     r.status==='REJECTED' ? '却下済' : '未承認');
+  buildHeaderBtns();
+}
+
+/* ===== モーダル共通 ===== */
+function openRegCommon({titlePrefix, name, phone, detail={}}){
+  document.getElementById('regTitle').textContent = `${titlePrefix}（${name}）`;
+  const map = {
+    rgKana: name || '', rgName: '', rgStage:'',
+    rgDob:'', rgAddr:'', rgTel:phone||'', rgEmail:'',
+    rgHeight:'', rgCloth:'', rgShoe:'', rgDays:'', rgHours:'', rgWage:'',
+    rgTattoo:'', rgPickup:'', rgAlcohol:'普通',
+    rgExp:'', rgNgShops:'', rgNote:'',
+    rgIdCheck1:'', rgIdCheck2:'', rgPledge1:'済', rgPledge2:'済',
+    rgRoute:'', rgRef:'', rgMotivation:'', rgCompare:'', rgAgencies:'', rgReason:'', rgPoints:'', rgEtc:'', rgAllowance:''
+  };
+  for(const k of Object.keys(map)){
+    const el = document.getElementById(k);
+    if(el) el.value = (detail[k] ?? map[k]);
+  }
+  const av = document.getElementById('regAvatar'); av.innerHTML = '<span>No Image</span>';
+  document.getElementById('regPhoto').value = '';
+  state.photoSet = false;
+  document.getElementById('regModal').style.display='flex';
+}
+function closeReg(){ document.getElementById('regModal').style.display='none'; }
+document.getElementById('regPhoto').addEventListener('change', (e)=>{
+  const file = e.target.files?.[0]; if(!file) { state.photoSet=false; return; }
+  const url = URL.createObjectURL(file);
+  const av = document.getElementById('regAvatar');
+  av.innerHTML = `<img src="${url}" alt="preview">`;
+  state.photoSet = true;
+});
+
+/* ===== ボタン（面接/申請） ===== */
+function buildHeaderBtns(){
+  const box = document.getElementById('regHeaderBtns');
+  if(state.regMode==='interview'){
+    box.innerHTML = `
+      <button class="btn primary" onclick="saveInterviewToPrereg()">保存して本登録申請へ</button>
+      <button class="btn" onclick="closeReg()">閉じる</button>`;
+  }else{
+    box.innerHTML = `
+      <button class="btn ghost" onclick="reject(state.openingId)">却下</button>
+      <button class="btn success" onclick="approve(state.openingId)">承認</button>
+      <button class="btn" onclick="closeReg()">閉じる</button>`;
+  }
+}
+
+/* ===== 必須チェック ===== */
+function validateRegForm(){
+  const requiredIds = ['rgKana','rgName','rgDob','rgAddr','rgTel','rgIdCheck1','rgIdCheck2','rgPledge1','rgPledge2'];
+  const miss = [];
+  requiredIds.forEach(id=>{
+    const el = document.getElementById(id);
+    const v = (el?.value||'').trim();
+    if(!v) miss.push(id);
+  });
+  if(!state.photoSet) miss.push('写真');
+  return { ok: miss.length===0, miss };
+}
+
+/* ===== 面接→本登録申請へ保存 ===== */
+function saveInterviewToPrereg(){
+  const v = validateRegForm();
+  if(!v.ok){ alert('必須項目が未入力です：\n' + v.miss.join(', ')); return; }
+  const sc = state.scheduled.find(x=>x.id===state.openingId); if(!sc) return;
+  const detail = collectRegDetail();
+  let r = state.prereg.find(x=>x.name===sc.name && x.status!=='REJECTED');
+  if(!r){
+    r = {id:'rg-'+Date.now(), name:sc.name, phone:sc.phone, status:'PENDING', credentials:null, detail:{}};
+    state.prereg.unshift(r);
+  }
+  r.detail = detail;
+  persist();
+  closeReg();
+  setTab('prereg');
+  render();
+}
+
+/* ===== 承認/却下（ID/PW発行） ===== */
+function approve(id){
+  const r = state.prereg.find(x=>x.id===id); if(!r){ const rid = state.openingId; return approve(rid); }
+  const last4 = (r.phone||'').replace(/\D/g,'').slice(-4) || String(Math.floor(Math.random()*10000)).padStart(4,'0');
+  const alpha = String.fromCharCode(65 + Math.floor(Math.random()*26));
+  const id3   = String(Math.floor(Math.random()*1000)).padStart(3,'0');
+  r.credentials = {id: alpha + id3, pw: last4};
+  r.status = 'APPROVED';
+  if(state.openingId===id) r.detail = collectRegDetail();
+  persist(); render();
+  document.getElementById('rgResult').textContent = `承認済：ID=${r.credentials.id} / 初期PW=${r.credentials.pw}`;
+}
+function reject(id){
+  const r = state.prereg.find(x=>x.id===id); if(!r){ return; }
+  r.status = 'REJECTED';
+  persist(); render();
+}
+
+/* ===== 詳細入力値収集 ===== */
+function collectRegDetail(){
+  const ids = [
+    'rgKana','rgName','rgStage','rgDob','rgAddr','rgTel','rgEmail',
+    'rgHeight','rgCloth','rgShoe','rgDays','rgHours','rgWage',
+    'rgTattoo','rgPickup','rgAlcohol','rgExp','rgNgShops','rgNote',
+    'rgIdCheck1','rgIdCheck2','rgPledge1','rgPledge2',
+    'rgRoute','rgRef','rgMotivation','rgCompare','rgAgencies','rgReason','rgPoints','rgEtc','rgAllowance'
+  ];
+  const obj={}; for(const id of ids){ const el=document.getElementById(id); if(el) obj[id]=el.value; }
+  return obj;
+}
+
+/* ===== 面接申込：新規 ===== */
+document.getElementById('btnNewApply').onclick = ()=>{ openIv(); };
+function openIv(){
+  ivName.value=''; ivAge.value=''; ivPhone.value=''; ivMedia.value='ウェブ'; ivDate.value=''; ivMemo.value='';
+  document.getElementById('ivModal').style.display='flex';
+}
+function closeIv(){ document.getElementById('ivModal').style.display='none'; }
+document.getElementById('ivSave').onclick = ()=>{
+  const payload = {
+    id:'ap-'+Date.now(),
+    name: ivName.value.trim(),
+    age: Number(ivAge.value)||null,
+    phone: ivPhone.value.trim(),
+    media: ivMedia.value,
+    ivDate: ivDate.value || '',
+    memo: ivMemo.value.trim()
+  };
+  if(!payload.name || !payload.phone){ alert('名前と電話は必須です'); return; }
+  state.applies.unshift(payload);
+  persist(); closeIv(); render();
+};
+
+/* ===== ヘルパ ===== */
+function esc(s){ return (s??'').toString().replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+/* ===== 初期化 ===== */
+setTab('apply');
+render();
+</script>
+</body>
+</html>
